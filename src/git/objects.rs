@@ -2,7 +2,8 @@ use std::io::Write;
 use std::path::Path;
 
 use atoi::FromRadix10Checked;
-use flate2::write::ZlibDecoder;
+use flate2;
+use flate2::write::{ZlibDecoder, ZlibEncoder};
 use log::debug;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -12,8 +13,13 @@ use crate::git::Result;
 
 const READ_FILE_BUFFER_SIZE: usize = 4096;
 
+const BLOB_HEADER: &[u8] = b"blob ";
+const TREE_HEADER: &[u8] = b"tree ";
+const COMMIT_HEADER: &[u8] = b"commit ";
+
+#[derive(Debug, Default)]
 pub struct Blob {
-    content: Vec<u8>,
+    pub(crate) content: Vec<u8>,
 }
 
 impl Blob {
@@ -37,13 +43,13 @@ impl Blob {
         debug!("Done loading blob from {}", path.as_ref().display());
 
         match &data[0..5] {
-            b"blob " => {}
-            b"tree " => {
+            BLOB_HEADER => {}
+            TREE_HEADER => {
                 return Err(InvalidObject(
                     "Expecting blob, found tree object".to_string(),
                 ));
             }
-            b"commit " => {
+            COMMIT_HEADER => {
                 return Err(InvalidObject(
                     "Expecting commit, found tree object".to_string(),
                 ));
@@ -82,6 +88,28 @@ impl Blob {
         Ok(Self {
             content: data.drain(null_char_idx + 1..).collect(),
         })
+    }
+
+    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
+        // TODO make this true async
+        debug!("Writing blob to {}", path.as_ref().display());
+        let file = std::fs::File::create(&path)?;
+        let writer = std::io::BufWriter::new(file);
+        let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
+        encoder.write_all(BLOB_HEADER)?;
+        encoder.write_all(format!("{}\0", self.content.len()).as_bytes())?;
+        encoder.write_all(&self.content)?;
+        encoder.flush()?;
+        let total_written = encoder.total_out();
+        let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
+        encoder.finish()?;
+        debug!(
+            "Done writing {} bytes to blob {}. Compress ratio {:.2}%",
+            total_written,
+            path.as_ref().display(),
+            compress_ratio
+        );
+        Ok(())
     }
 
     pub fn content_utf8(&self) -> Result<String> {
