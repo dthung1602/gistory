@@ -1,6 +1,4 @@
 use std::io::Write;
-use std::net::ToSocketAddrs;
-use std::os::unix::raw::mode_t;
 use std::path::{Path, PathBuf};
 
 use atoi::FromRadix10Checked;
@@ -16,10 +14,6 @@ use crate::git::Error::InvalidObjectFormat;
 use crate::git::Result;
 
 const READ_FILE_BUFFER_SIZE: usize = 4096;
-
-const BLOB_HEADER: &[u8] = b"blob ";
-const TREE_HEADER: &[u8] = b"tree ";
-const COMMIT_HEADER: &[u8] = b"commit ";
 
 const CONTENT_HASH_LEN: usize = 20;
 type ContentHash = [u8; CONTENT_HASH_LEN];
@@ -62,7 +56,7 @@ pub trait Object {
             decoder.write_all(&buff[..size])?;
         }
         let mut data = decoder.finish()?;
-        if data.len() == 0 {
+        if data.is_empty() {
             return Err(InvalidObjectFormat("Empty object file".to_string()));
         }
         debug!("Done loading object file from {path_display}");
@@ -76,7 +70,7 @@ pub trait Object {
         let expected_header = obj_type.header();
         let header_len = expected_header.len();
 
-        if !data.starts_with(&expected_header) {
+        if !data.starts_with(expected_header) {
             return Err(InvalidObjectFormat(format!(
                 "Invalid header. Expected '{}'",
                 String::from_utf8(expected_header.into())?
@@ -115,6 +109,32 @@ pub trait Object {
         let hash: ContentHash = hasher.finalize().into();
         Ok((obj_type, content, hash))
     }
+
+    async fn write_obj_to_file(
+        content: &[u8],
+        obj_type: ObjectType,
+        path: impl AsRef<Path>,
+    ) -> Result<()> {
+        // TODO make this true async
+        let path_display = path.as_ref().display();
+        debug!("Writing object to file {path_display}");
+
+        let file = std::fs::File::create(&path)?;
+        let writer = std::io::BufWriter::new(file);
+        let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
+        encoder.write_all(obj_type.header())?;
+        encoder.write_all(format!("{}\0", content.len()).as_bytes())?;
+        encoder.write_all(content)?;
+        encoder.flush()?;
+        let total_written = encoder.total_out();
+        let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
+        encoder.finish()?;
+        debug!(
+            "Done writing {} bytes to file {}. Compress ratio {:.2}%",
+            total_written, path_display, compress_ratio
+        );
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -147,25 +167,7 @@ impl Blob {
     }
 
     pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
-        // TODO make this true async
-        debug!("Writing blob to {}", path.as_ref().display());
-        let file = std::fs::File::create(&path)?;
-        let writer = std::io::BufWriter::new(file);
-        let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
-        encoder.write_all(BLOB_HEADER)?;
-        encoder.write_all(format!("{}\0", self.content.len()).as_bytes())?;
-        encoder.write_all(&self.content)?;
-        encoder.flush()?;
-        let total_written = encoder.total_out();
-        let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
-        encoder.finish()?;
-        debug!(
-            "Done writing {} bytes to blob {}. Compress ratio {:.2}%",
-            total_written,
-            path.as_ref().display(),
-            compress_ratio
-        );
-        Ok(())
+        Self::write_obj_to_file(&self.content, ObjectType::Blob, path).await
     }
 
     pub fn content_utf8(&self) -> Result<String> {
@@ -173,7 +175,7 @@ impl Blob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TreeNodeMode {
     Regular,
     Executable,
@@ -201,6 +203,14 @@ impl TreeNodeMode {
             Err(InvalidObjectFormat("Invalid file mode".to_string()))
         }
     }
+
+    fn to_bytes(&self) -> &[u8] {
+        match self {
+            TreeNodeMode::Regular => b"100644",
+            TreeNodeMode::Executable => b"100755",
+            TreeNodeMode::Directory => b"40000",
+        }
+    }
 }
 
 impl Default for TreeNodeMode {
@@ -209,14 +219,14 @@ impl Default for TreeNodeMode {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct TreeNode {
     pub(crate) mode: TreeNodeMode,
     pub(crate) name: String,
     pub(crate) hash: ContentHash,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Tree {
     pub(crate) nodes: Vec<TreeNode>,
     pub(crate) hash: ContentHash,
@@ -294,5 +304,22 @@ impl Tree {
 
         debug!("Found node {name} ({hash_end_idx} bytes)");
         Ok((TreeNode { mode, name, hash }, hash_end_idx))
+    }
+
+    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
+        let estimated_len = self.nodes.len() * (6 + 1 + 36 + 1 + 20); // assume a file name is on avg 36 bytes
+        let mut content: Vec<u8> = Vec::with_capacity(estimated_len);
+
+        for node in &self.nodes {
+            // assume nodes are already sorted by name
+            let mode = node.mode.to_bytes();
+            content.extend_from_slice(mode);
+            content.push(b' ');
+            content.extend_from_slice(node.name.as_bytes());
+            content.push(0);
+            content.extend_from_slice(&node.hash);
+        }
+
+        Self::write_obj_to_file(&content, ObjectType::Tree, path).await
     }
 }
