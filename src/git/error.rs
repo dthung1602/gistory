@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use derive_more::From;
+use hex::FromHexError;
 
 #[derive(From, Debug)]
 pub enum Error {
@@ -8,10 +9,12 @@ pub enum Error {
     #[from]
     Io(std::io::Error),
     #[from]
-    FromUtf8(std::string::FromUtf8Error),
+    Utf8(std::string::FromUtf8Error),
+    #[from]
+    Hex(FromHexError),
     // Internal error
     #[from]
-    InvalidObject(String),
+    InvalidObjectFormat(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

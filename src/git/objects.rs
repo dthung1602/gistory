@@ -1,14 +1,18 @@
 use std::io::Write;
-use std::path::Path;
+use std::net::ToSocketAddrs;
+use std::os::unix::raw::mode_t;
+use std::path::{Path, PathBuf};
 
 use atoi::FromRadix10Checked;
 use flate2;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
+use hex;
 use log::debug;
+use sha1::{Digest, Sha1};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, BufReader};
 
-use crate::git::Error::InvalidObject;
+use crate::git::Error::InvalidObjectFormat;
 use crate::git::Result;
 
 const READ_FILE_BUFFER_SIZE: usize = 4096;
@@ -17,14 +21,32 @@ const BLOB_HEADER: &[u8] = b"blob ";
 const TREE_HEADER: &[u8] = b"tree ";
 const COMMIT_HEADER: &[u8] = b"commit ";
 
-#[derive(Debug, Default)]
-pub struct Blob {
-    pub(crate) content: Vec<u8>,
+const CONTENT_HASH_LEN: usize = 20;
+type ContentHash = [u8; CONTENT_HASH_LEN];
+
+#[derive(Debug)]
+pub enum ObjectType {
+    Blob,
+    Tree,
+    Commit,
 }
 
-impl Blob {
-    pub async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        debug!("Loading blob from {}", path.as_ref().display());
+impl ObjectType {
+    fn header(&self) -> &[u8] {
+        match self {
+            ObjectType::Blob => b"blob ",
+            ObjectType::Tree => b"tree ",
+            ObjectType::Commit => b"commit ",
+        }
+    }
+}
+
+pub trait Object {
+    async fn read_obj_from_file(
+        path: impl AsRef<Path>,
+    ) -> Result<(ObjectType, Vec<u8>, ContentHash)> {
+        let path_display = path.as_ref().display();
+        debug!("Loading object file {path_display}");
 
         let data: Vec<u8> = Vec::with_capacity(READ_FILE_BUFFER_SIZE);
         let mut decoder = ZlibDecoder::new(data);
@@ -40,54 +62,88 @@ impl Blob {
             decoder.write_all(&buff[..size])?;
         }
         let mut data = decoder.finish()?;
-        debug!("Done loading blob from {}", path.as_ref().display());
+        if data.len() == 0 {
+            return Err(InvalidObjectFormat("Empty object file".to_string()));
+        }
+        debug!("Done loading object file from {path_display}");
 
-        match &data[0..5] {
-            BLOB_HEADER => {}
-            TREE_HEADER => {
-                return Err(InvalidObject(
-                    "Expecting blob, found tree object".to_string(),
-                ));
-            }
-            COMMIT_HEADER => {
-                return Err(InvalidObject(
-                    "Expecting commit, found tree object".to_string(),
-                ));
-            }
-            _ => {
-                return Err(InvalidObject(
-                    "Invalid type header in object file".to_string(),
-                ));
-            }
+        let obj_type = match data[0] {
+            b'b' => ObjectType::Blob,
+            b't' => ObjectType::Tree,
+            b'c' => ObjectType::Commit,
+            _ => return Err(InvalidObjectFormat("Invalid header".to_string())),
+        };
+        let expected_header = obj_type.header();
+        let header_len = expected_header.len();
+
+        if !data.starts_with(&expected_header) {
+            return Err(InvalidObjectFormat(format!(
+                "Invalid header. Expected '{}'",
+                String::from_utf8(expected_header.into())?
+            )));
         }
 
         // assume max file size in git is 4GiB
-        let (Some(body_len), bytes_read) = usize::from_radix_10_checked(&data[5..]) else {
-            return Err(InvalidObject("Invalid body len in object file".to_string()));
+        let (Some(body_len), size_len) = usize::from_radix_10_checked(&data[header_len..]) else {
+            return Err(InvalidObjectFormat(
+                "Invalid body len in object file".to_string(),
+            ));
         };
 
-        let null_char_idx = 5 + bytes_read;
-        if data[null_char_idx] != 0 {
-            return Err(InvalidObject(
-                "Invalid \\0 character in object file".to_string(),
-            ));
+        let null_char_idx = header_len + size_len;
+        match data.get(null_char_idx) {
+            Some(0) => {}
+            _ => {
+                return Err(InvalidObjectFormat(
+                    "Not found \\0 char at expected place in object file".to_string(),
+                ));
+            }
         }
 
-        let remain_len = data.len() - 5 - bytes_read - 1;
+        let remain_len = data.len() - header_len - size_len - 1;
         if remain_len != body_len {
-            return Err(InvalidObject(format!(
+            return Err(InvalidObjectFormat(format!(
                 "Invalid data length in object file. Expected {body_len}, got {remain_len}",
             )));
         }
 
-        debug!(
-            "Uncompressed content len from {}: {}",
-            path.as_ref().display(),
-            body_len
-        );
-        Ok(Self {
-            content: data.drain(null_char_idx + 1..).collect(),
-        })
+        debug!("Get {body_len} bytes of content from {path_display}");
+        let content: Vec<u8> = data.drain(null_char_idx + 1..).collect();
+
+        let mut hasher = Sha1::new();
+        hasher.update(content.as_slice());
+        let hash: ContentHash = hasher.finalize().into();
+        Ok((obj_type, content, hash))
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Blob {
+    pub(crate) content: Vec<u8>,
+    pub(crate) hash: ContentHash,
+}
+
+impl Object for Blob {}
+
+impl Blob {
+    pub async fn from_hash(hash: impl AsRef<ContentHash>) -> Result<Self> {
+        let hash = hex::encode(hash.as_ref());
+        let mut path_buf = PathBuf::from(".git/objects");
+        path_buf.push(&hash[0..2]);
+        path_buf.push(&hash[2..]);
+
+        Self::from_file(&path_buf).await
+    }
+
+    pub async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let (obj_type, content, hash) = Self::read_obj_from_file(path).await?;
+        match obj_type {
+            ObjectType::Blob => Ok(Self { content, hash }),
+            _ => Err(InvalidObjectFormat(format!(
+                "Expected blob, found {:?}",
+                obj_type
+            ))),
+        }
     }
 
     pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
@@ -114,5 +170,129 @@ impl Blob {
 
     pub fn content_utf8(&self) -> Result<String> {
         Ok(String::from_utf8(self.content.clone())?)
+    }
+}
+
+#[derive(Debug)]
+pub enum TreeNodeMode {
+    Regular,
+    Executable,
+    Directory,
+    // Symlink,
+    // Submodule,
+}
+
+impl TreeNodeMode {
+    fn from_bytes(content: &[u8]) -> Result<(Self, usize)> {
+        if let (Some(mode), used_bytes) = usize::from_radix_10_checked(content) {
+            let tree_mode = match mode {
+                100644 => Self::Regular,
+                100755 => Self::Executable,
+                40000 => Self::Directory,
+                120000 | 160000 => {
+                    return Err(InvalidObjectFormat(
+                        "Not supported symlink & submodule".to_string(),
+                    ));
+                }
+                _ => return Err(InvalidObjectFormat(format!("Invalid file mode: {mode}"))),
+            };
+            Ok((tree_mode, used_bytes))
+        } else {
+            Err(InvalidObjectFormat("Invalid file mode".to_string()))
+        }
+    }
+}
+
+impl Default for TreeNodeMode {
+    fn default() -> Self {
+        Self::Regular
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct TreeNode {
+    pub(crate) mode: TreeNodeMode,
+    pub(crate) name: String,
+    pub(crate) hash: ContentHash,
+}
+
+#[derive(Debug, Default)]
+pub struct Tree {
+    pub(crate) nodes: Vec<TreeNode>,
+    pub(crate) hash: ContentHash,
+}
+
+impl Object for Tree {}
+
+impl Tree {
+    pub async fn from_file(path: impl AsRef<Path>) -> Result<Tree> {
+        let path_display = path.as_ref().display();
+        let (obj_type, content, hash) = Self::read_obj_from_file(&path).await?;
+        match obj_type {
+            ObjectType::Tree => {}
+            _ => {
+                return Err(InvalidObjectFormat(format!(
+                    "Expected tree, found {:?} in {}",
+                    obj_type, path_display,
+                )));
+            }
+        }
+
+        debug!("Parsing tree nodes");
+        let mut parse_idx = 0;
+        let content_len = content.len();
+        let mut nodes = Vec::new();
+        while parse_idx < content_len {
+            let (node, parsed_byte_count) = Self::parse_node(&content[parse_idx..])?;
+            parse_idx += parsed_byte_count;
+            nodes.push(node);
+        }
+
+        Ok(Tree { nodes, hash })
+    }
+
+    fn parse_node(content: &[u8]) -> Result<(TreeNode, usize)> {
+        let (mode, mode_byte_count) = TreeNodeMode::from_bytes(content)?;
+        match content.get(mode_byte_count) {
+            Some(b' ') => {}
+            _ => {
+                return Err(InvalidObjectFormat(
+                    "Not found space character at expected place in tree node".to_string(),
+                ));
+            }
+        }
+
+        let name_start_idx = mode_byte_count + 1;
+        let name_len = content[name_start_idx..]
+            .iter()
+            .take_while(|x| **x != 0)
+            .count();
+        if name_len == 0 {
+            return Err(InvalidObjectFormat("Empty name for tree node".to_string()));
+        }
+        let name_end_idx = name_start_idx + name_len;
+        let name = String::from_utf8(content[name_start_idx..name_end_idx].to_vec())?;
+
+        match content.get(name_end_idx) {
+            Some(0) => {}
+            _ => {
+                return Err(InvalidObjectFormat(
+                    "Not found \\0 character at expected place in tree node".to_string(),
+                ));
+            }
+        }
+
+        let hash_start_idx = name_end_idx + 1;
+        let hash_end_idx = hash_start_idx + CONTENT_HASH_LEN;
+        if hash_end_idx > content.len() {
+            return Err(InvalidObjectFormat(
+                "Not enough data for hash in tree node".to_string(),
+            ));
+        }
+        let mut hash = ContentHash::default();
+        hash.copy_from_slice(&content[hash_start_idx..hash_end_idx]);
+
+        debug!("Found node {name} ({hash_end_idx} bytes)");
+        Ok((TreeNode { mode, name, hash }, hash_end_idx))
     }
 }
