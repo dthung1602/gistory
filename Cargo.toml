@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 atoi = "2.0.0"
+chrono = "0.4.41"
 derive_more = { version = "2.0.1", features = ["from"] }
 env_logger = "0.11.8"
 flate2 = "1.1.2"

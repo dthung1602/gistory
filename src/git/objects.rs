@@ -1,7 +1,10 @@
+use std::fmt::Debug;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use atoi::FromRadix10Checked;
+use chrono::{DateTime, FixedOffset, TimeZone};
 use flate2;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use hex;
@@ -13,9 +16,11 @@ use tokio::io::{AsyncReadExt, BufReader};
 use crate::git::Error::InvalidObjectFormat;
 use crate::git::Result;
 
+// region Common
 const READ_FILE_BUFFER_SIZE: usize = 4096;
 
 const CONTENT_HASH_LEN: usize = 20;
+const HEX_CONTENT_HASH_LEN: usize = CONTENT_HASH_LEN * 2;
 type ContentHash = [u8; CONTENT_HASH_LEN];
 
 #[derive(Debug)]
@@ -137,6 +142,10 @@ pub trait Object {
     }
 }
 
+// endregion
+
+// region Blob
+
 #[derive(Debug, Default)]
 pub struct Blob {
     pub(crate) content: Vec<u8>,
@@ -174,6 +183,10 @@ impl Blob {
         Ok(String::from_utf8(self.content.clone())?)
     }
 }
+
+// endregion
+
+// region Tree
 
 #[derive(Debug, PartialEq)]
 pub enum TreeNodeMode {
@@ -323,3 +336,184 @@ impl Tree {
         Self::write_obj_to_file(&content, ObjectType::Tree, path).await
     }
 }
+
+// endregion
+
+// region Commit
+
+#[derive(Debug, Default)]
+pub struct User {
+    pub name: String,
+    pub email: String,
+    pub date_time: DateTime<FixedOffset>,
+}
+
+#[derive(Debug, Default)]
+pub struct Commit {
+    pub(crate) hash: ContentHash,
+    pub(crate) tree: ContentHash,
+    pub(crate) parents: Vec<ContentHash>,
+    pub(crate) author: User,
+    pub(crate) committer: User,
+    pub(crate) message: String,
+}
+
+impl Object for Commit {}
+
+impl Commit {
+    pub(crate) async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let (obj_type, content, hash) = Self::read_obj_from_file(path).await?;
+        match obj_type {
+            ObjectType::Commit => {}
+            _ => {
+                return Err(InvalidObjectFormat(format!(
+                    "Expected commit, found {:?}",
+                    obj_type
+                )));
+            }
+        }
+
+        let (tree_hash, mut total_read_bytes) = Self::parse_hash(b"tree ", &content)?;
+
+        let mut parents_hash = Vec::new();
+        while let Ok((parent_hash, parent_read_bytes)) =
+            Self::parse_hash(b"parent ", &content[total_read_bytes..])
+        {
+            parents_hash.push(parent_hash);
+            total_read_bytes += parent_read_bytes;
+        }
+
+        let (author, author_read_bytes) =
+            Self::parse_user(b"author ", &content[total_read_bytes..])?;
+        total_read_bytes += author_read_bytes;
+
+        let (committer, committer_read_bytes) =
+            Self::parse_user(b"committer ", &content[total_read_bytes..])?;
+        total_read_bytes += committer_read_bytes;
+
+        // we dont support gpgsig
+
+        match content.get(total_read_bytes) {
+            Some(b'\n') => {}
+            _ => {
+                return Err(InvalidObjectFormat(
+                    "Not found \\n character at expected place in commit object".to_string(),
+                ));
+            }
+        }
+        let message = String::from_utf8(content[total_read_bytes + 1..].to_vec())?;
+
+        Ok(Commit {
+            hash,
+            tree: tree_hash,
+            parents: parents_hash,
+            author,
+            committer,
+            message,
+        })
+    }
+
+    fn parse_hash(header: &[u8], content: &[u8]) -> Result<(ContentHash, usize)> {
+        if !content.starts_with(header) {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot find header {} in commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        }
+
+        let header_len = header.len();
+        let end_idx = header_len + HEX_CONTENT_HASH_LEN;
+        if end_idx > content.len() {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot parse header {} of commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        }
+
+        let hash: ContentHash = hex::decode(&content[header_len..end_idx])?
+            .try_into()
+            .map_err(|_| {
+                InvalidObjectFormat(format!(
+                    "Cannot parse header {} of commit object",
+                    String::from_utf8(header.to_vec()).unwrap()
+                ))
+            })?;
+
+        Ok((hash, end_idx + 1))
+    }
+
+    fn parse_user(header: &[u8], content: &[u8]) -> Result<(User, usize)> {
+        if !content.starts_with(header) {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot find header {} in commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        }
+
+        let Some((email_start_idx, _)) = content.iter().enumerate().find(|(_, x)| **x == b'<')
+        else {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot find < while parsing {} in commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        };
+        let Some((email_end_idx, _)) = content.iter().enumerate().find(|(_, x)| **x == b'>') else {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot find > while parsing {} in commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        };
+        if email_start_idx + 1 >= email_end_idx {
+            return Err(InvalidObjectFormat(
+                "Invalid email marker in commit object".to_string(),
+            ));
+        }
+
+        let name = String::from_utf8(content[header.len()..email_start_idx].to_vec())?
+            .trim()
+            .to_string();
+        let email = String::from_utf8(content[email_start_idx + 1..email_end_idx].to_vec())?
+            .trim()
+            .to_string();
+
+        let Some((end_of_line, _)) = content.iter().enumerate().find(|(_, x)| **x == b'\n') else {
+            return Err(InvalidObjectFormat(format!(
+                "Cannot find \\n while parsing {} in commit object",
+                String::from_utf8(header.to_vec())?
+            )));
+        };
+        let timestamp_str =
+            String::from_utf8(content[email_end_idx + 1..end_of_line + 1].to_vec())?
+                .trim()
+                .to_string();
+
+        let parts: Vec<&str> = timestamp_str.splitn(2, " ").collect();
+        if parts.len() != 2 {
+            return Err(InvalidObjectFormat(
+                "Cannot parse commit timestamp".to_string(),
+            ));
+        }
+
+        let timestamp_seconds: i64 = parts[0]
+            .parse()
+            .map_err(|_| InvalidObjectFormat("Cannot parse commit timestamp".to_string()))?;
+        let offset = FixedOffset::from_str(parts[1])
+            .map_err(|_| InvalidObjectFormat("Failed to parse timezone offset".to_string()))?;
+
+        let Some(date_time) = offset.timestamp_opt(timestamp_seconds, 0).earliest() else {
+            return Err(InvalidObjectFormat(
+                "Cannot parse timestamp and timezone".to_string(),
+            ));
+        };
+
+        let total_read_bytes = end_of_line + 1;
+        let user = User {
+            name,
+            email,
+            date_time,
+        };
+        Ok((user, total_read_bytes))
+    }
+}
+
+// endregion
