@@ -30,7 +30,10 @@ async fn main() -> error::Result<()> {
     assert_eq!(tree, new_tree);
 
     let commit = git::objects::Commit::from_file(COMMIT).await?;
-    info!("COMMIT: {:?}", commit);
+    commit.to_file(COMMIT2).await?;
+
+    let new_commit = git::objects::Commit::from_file(COMMIT2).await?;
+    assert_eq!(commit, new_commit);
 
     info!("--> DONE <--");
     Ok(())

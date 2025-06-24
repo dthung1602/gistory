@@ -6,6 +6,7 @@ use std::str::FromStr;
 use atoi::FromRadix10Checked;
 use chrono::{DateTime, FixedOffset, TimeZone};
 use flate2;
+use flate2::bufread;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use hex;
 use log::debug;
@@ -341,14 +342,14 @@ impl Tree {
 
 // region Commit
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct User {
-    pub name: String,
-    pub email: String,
-    pub date_time: DateTime<FixedOffset>,
+    pub(crate) name: String,
+    pub(crate) email: String,
+    pub(crate) date_time: DateTime<FixedOffset>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Commit {
     pub(crate) hash: ContentHash,
     pub(crate) tree: ContentHash,
@@ -361,7 +362,7 @@ pub struct Commit {
 impl Object for Commit {}
 
 impl Commit {
-    pub(crate) async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+    pub async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
         let (obj_type, content, hash) = Self::read_obj_from_file(path).await?;
         match obj_type {
             ObjectType::Commit => {}
@@ -401,7 +402,9 @@ impl Commit {
                 ));
             }
         }
-        let message = String::from_utf8(content[total_read_bytes + 1..].to_vec())?;
+
+        // the message is the rest of the file, except for the last char, which is \n
+        let message = String::from_utf8(content[total_read_bytes + 1..content.len() - 1].to_vec())?;
 
         Ok(Commit {
             hash,
@@ -513,6 +516,39 @@ impl Commit {
             date_time,
         };
         Ok((user, total_read_bytes))
+    }
+
+    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
+        let mut content = Vec::with_capacity(512); // estimated
+
+        Self::write_hash(&mut content, b"tree ", &self.tree);
+        for parent in &self.parents {
+            Self::write_hash(&mut content, b"parent ", parent);
+        }
+
+        Self::write_user(&mut content, b"author ", &self.author);
+        Self::write_user(&mut content, b"committer ", &self.committer);
+
+        content.push(b'\n');
+        content.extend(self.message.as_bytes());
+        content.push(b'\n');
+
+        Self::write_obj_to_file(&content, ObjectType::Commit, path).await
+    }
+
+    fn write_hash(buffer: &mut Vec<u8>, header: &[u8], content_hash: &ContentHash) {
+        buffer.extend(header);
+        buffer.extend(hex::encode(content_hash).as_bytes());
+        buffer.push(b'\n');
+    }
+
+    fn write_user(buffer: &mut Vec<u8>, header: &[u8], user: &User) {
+        buffer.extend(header);
+        buffer.extend(user.name.as_bytes());
+        buffer.extend(b" <");
+        buffer.extend(user.email.as_bytes());
+        let date_str = user.date_time.format("> %s %z\n").to_string();
+        buffer.extend(date_str.as_bytes());
     }
 }
 
