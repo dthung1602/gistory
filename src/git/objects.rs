@@ -1,28 +1,24 @@
 use std::fmt::Debug;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 
 use atoi::FromRadix10Checked;
 use chrono::{DateTime, FixedOffset, TimeZone};
 use flate2;
-use flate2::bufread;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
-use hex;
 use log::debug;
-use sha1::{Digest, Sha1};
-use tokio::fs;
 use tokio::io::{AsyncReadExt, BufReader};
 
 use crate::git::Error::InvalidObjectFormat;
 use crate::git::Result;
+use crate::git::context::GitContext;
+use crate::git::hash::{
+    CONTENT_HASH_LEN, ContentHash, HEX_CONTENT_HASH_LEN, calculate_content_hash,
+};
 
 // region Common
 const READ_FILE_BUFFER_SIZE: usize = 4096;
-
-const CONTENT_HASH_LEN: usize = 20;
-const HEX_CONTENT_HASH_LEN: usize = CONTENT_HASH_LEN * 2;
-type ContentHash = [u8; CONTENT_HASH_LEN];
 
 #[derive(Debug)]
 pub enum ObjectType {
@@ -41,147 +37,161 @@ impl ObjectType {
     }
 }
 
-pub trait Object {
-    async fn read_obj_from_file(
-        path: impl AsRef<Path>,
-    ) -> Result<(ObjectType, Vec<u8>, ContentHash)> {
-        let path_display = path.as_ref().display();
-        debug!("Loading object file {path_display}");
+async fn read_obj_from_file(path: impl AsRef<Path>) -> Result<(ObjectType, Vec<u8>)> {
+    let path_display = path.as_ref().display();
+    debug!("Loading object file {path_display}");
 
-        let data: Vec<u8> = Vec::with_capacity(READ_FILE_BUFFER_SIZE);
-        let mut decoder = ZlibDecoder::new(data);
-        let mut buff: [u8; READ_FILE_BUFFER_SIZE] = [0; READ_FILE_BUFFER_SIZE];
-        let file = fs::File::open(&path).await?;
-        let mut reader = BufReader::new(file);
+    let data: Vec<u8> = Vec::with_capacity(READ_FILE_BUFFER_SIZE);
+    let mut decoder = ZlibDecoder::new(data);
+    let mut buff: [u8; READ_FILE_BUFFER_SIZE] = [0; READ_FILE_BUFFER_SIZE];
+    let file = tokio::fs::File::open(&path).await?;
+    let mut reader = BufReader::new(file);
 
-        loop {
-            let size = reader.read(&mut buff).await?;
-            if size == 0 {
-                break;
-            }
-            decoder.write_all(&buff[..size])?;
+    loop {
+        let size = reader.read(&mut buff).await?;
+        if size == 0 {
+            break;
         }
-        let mut data = decoder.finish()?;
-        if data.is_empty() {
-            return Err(InvalidObjectFormat("Empty object file".to_string()));
-        }
-        debug!("Done loading object file from {path_display}");
+        decoder.write_all(&buff[..size])?;
+    }
+    let mut data = decoder.finish()?;
+    if data.is_empty() {
+        return Err(InvalidObjectFormat("Empty object file".to_string()));
+    }
+    debug!("Done loading object file from {path_display}");
 
-        let obj_type = match data[0] {
-            b'b' => ObjectType::Blob,
-            b't' => ObjectType::Tree,
-            b'c' => ObjectType::Commit,
-            _ => return Err(InvalidObjectFormat("Invalid header".to_string())),
-        };
-        let expected_header = obj_type.header();
-        let header_len = expected_header.len();
+    let obj_type = match data[0] {
+        b'b' => ObjectType::Blob,
+        b't' => ObjectType::Tree,
+        b'c' => ObjectType::Commit,
+        _ => return Err(InvalidObjectFormat("Invalid header".to_string())),
+    };
+    let expected_header = obj_type.header();
+    let header_len = expected_header.len();
 
-        if !data.starts_with(expected_header) {
-            return Err(InvalidObjectFormat(format!(
-                "Invalid header. Expected '{}'",
-                String::from_utf8(expected_header.into())?
-            )));
-        }
+    if !data.starts_with(expected_header) {
+        return Err(InvalidObjectFormat(format!(
+            "Invalid header. Expected '{}'",
+            String::from_utf8(expected_header.into())?
+        )));
+    }
 
-        // assume max file size in git is 4GiB
-        let (Some(body_len), size_len) = usize::from_radix_10_checked(&data[header_len..]) else {
+    // assume max file size in git is 4GiB
+    let (Some(body_len), size_len) = usize::from_radix_10_checked(&data[header_len..]) else {
+        return Err(InvalidObjectFormat(
+            "Invalid body len in object file".to_string(),
+        ));
+    };
+
+    let null_char_idx = header_len + size_len;
+    match data.get(null_char_idx) {
+        Some(0) => {}
+        _ => {
             return Err(InvalidObjectFormat(
-                "Invalid body len in object file".to_string(),
+                "Not found \\0 char at expected place in object file".to_string(),
             ));
-        };
-
-        let null_char_idx = header_len + size_len;
-        match data.get(null_char_idx) {
-            Some(0) => {}
-            _ => {
-                return Err(InvalidObjectFormat(
-                    "Not found \\0 char at expected place in object file".to_string(),
-                ));
-            }
         }
-
-        let remain_len = data.len() - header_len - size_len - 1;
-        if remain_len != body_len {
-            return Err(InvalidObjectFormat(format!(
-                "Invalid data length in object file. Expected {body_len}, got {remain_len}",
-            )));
-        }
-
-        debug!("Get {body_len} bytes of content from {path_display}");
-        let content: Vec<u8> = data.drain(null_char_idx + 1..).collect();
-
-        let mut hasher = Sha1::new();
-        hasher.update(content.as_slice());
-        let hash: ContentHash = hasher.finalize().into();
-        Ok((obj_type, content, hash))
     }
 
-    async fn write_obj_to_file(
-        content: &[u8],
-        obj_type: ObjectType,
-        path: impl AsRef<Path>,
-    ) -> Result<()> {
-        // TODO make this true async
-        let path_display = path.as_ref().display();
-        debug!("Writing object to file {path_display}");
-
-        let file = std::fs::File::create(&path)?;
-        let writer = std::io::BufWriter::new(file);
-        let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
-        encoder.write_all(obj_type.header())?;
-        encoder.write_all(format!("{}\0", content.len()).as_bytes())?;
-        encoder.write_all(content)?;
-        encoder.flush()?;
-        let total_written = encoder.total_out();
-        let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
-        encoder.finish()?;
-        debug!(
-            "Done writing {} bytes to file {}. Compress ratio {:.2}%",
-            total_written, path_display, compress_ratio
-        );
-        Ok(())
+    let remain_len = data.len() - header_len - size_len - 1;
+    if remain_len != body_len {
+        return Err(InvalidObjectFormat(format!(
+            "Invalid data length in object file. Expected {body_len}, got {remain_len}",
+        )));
     }
+
+    debug!("Get {body_len} bytes of content from {path_display}");
+    let content: Vec<u8> = data.drain(null_char_idx + 1..).collect();
+
+    Ok((obj_type, content))
+}
+
+async fn write_obj_to_file(
+    content: &[u8],
+    obj_type: ObjectType,
+    path: impl AsRef<Path>,
+) -> Result<usize> {
+    // TODO make this true async
+    let path_display = path.as_ref().display();
+    debug!("Writing object to file {path_display}");
+
+    // ensure parent dirs exists
+    let parent = path.as_ref().parent().unwrap();
+    tokio::fs::create_dir_all(parent).await?;
+
+    let file = std::fs::File::create(&path)?;
+    let writer = std::io::BufWriter::new(file);
+    let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
+    encoder.write_all(obj_type.header())?;
+    encoder.write_all(format!("{}\0", content.len()).as_bytes())?;
+    encoder.write_all(content)?;
+    encoder.flush()?;
+    let total_written = encoder.total_out();
+    let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
+    encoder.finish()?;
+    debug!(
+        "Done writing {} bytes to file {}. Compress ratio {:.2}%",
+        total_written, path_display, compress_ratio
+    );
+    Ok(total_written as usize)
+}
+
+pub trait Object: Sized + PartialEq {
+    fn get_hash(&self) -> &ContentHash;
+
+    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self>;
+
+    async fn write_to_file(&self, context: &GitContext) -> Result<usize>;
 }
 
 // endregion
 
 // region Blob
 
-#[derive(Debug, Default)]
+#[derive(Debug, PartialEq)]
 pub struct Blob {
-    pub(crate) content: Vec<u8>,
-    pub(crate) hash: ContentHash,
+    content: Vec<u8>,
+    hash: ContentHash,
 }
 
-impl Object for Blob {}
-
 impl Blob {
-    pub async fn from_hash(hash: impl AsRef<ContentHash>) -> Result<Self> {
-        let hash = hex::encode(hash.as_ref());
-        let mut path_buf = PathBuf::from(".git/objects");
-        path_buf.push(&hash[0..2]);
-        path_buf.push(&hash[2..]);
-
-        Self::from_file(&path_buf).await
+    pub fn get_content(&self) -> &[u8] {
+        &self.content
     }
 
-    pub async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        let (obj_type, content, hash) = Self::read_obj_from_file(path).await?;
+    pub fn set_content(&mut self, content: &[u8]) {
+        self.content.resize(content.len(), 0);
+        self.content.copy_from_slice(content);
+        self.hash = calculate_content_hash(&self.content)
+    }
+}
+
+impl Object for Blob {
+    fn get_hash(&self) -> &ContentHash {
+        &self.hash
+    }
+
+    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
+        let path = context.obj_path_from_hex(hex)?;
+        let path_display = path.display();
+
+        let (obj_type, content) = read_obj_from_file(&path).await?;
+
         match obj_type {
-            ObjectType::Blob => Ok(Self { content, hash }),
+            ObjectType::Blob => {
+                let hash = hex.try_into()?;
+                Ok(Self { content, hash })
+            }
             _ => Err(InvalidObjectFormat(format!(
-                "Expected blob, found {:?}",
-                obj_type
+                "Expected blob, found {:?} in {}",
+                obj_type, path_display
             ))),
         }
     }
 
-    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
-        Self::write_obj_to_file(&self.content, ObjectType::Blob, path).await
-    }
-
-    pub fn content_utf8(&self) -> Result<String> {
-        Ok(String::from_utf8(self.content.clone())?)
+    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
+        let path = context.obj_path_from_hash(&self.hash);
+        Ok(write_obj_to_file(&self.content, ObjectType::Blob, path).await?)
     }
 }
 
@@ -199,7 +209,7 @@ pub enum TreeNodeMode {
 }
 
 impl TreeNodeMode {
-    fn from_bytes(content: &[u8]) -> Result<(Self, usize)> {
+    fn parse(content: &[u8]) -> Result<(Self, usize)> {
         if let (Some(mode), used_bytes) = usize::from_radix_10_checked(content) {
             let tree_mode = match mode {
                 100644 => Self::Regular,
@@ -227,42 +237,61 @@ impl TreeNodeMode {
     }
 }
 
-impl Default for TreeNodeMode {
-    fn default() -> Self {
-        Self::Regular
+#[derive(Debug, PartialEq)]
+pub struct TreeNode {
+    pub mode: TreeNodeMode,
+    pub name: String,
+    pub hash: ContentHash,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Tree {
+    nodes: Vec<TreeNode>,
+    hash: ContentHash,
+}
+
+impl Object for Tree {
+    fn get_hash(&self) -> &ContentHash {
+        &self.hash
+    }
+
+    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
+        let path = context.obj_path_from_hex(hex)?;
+        let path_display = path.display();
+
+        let (obj_type, content) = read_obj_from_file(&path).await?;
+        match obj_type {
+            ObjectType::Tree => {
+                let nodes = Tree::parse_nodes(&content)?;
+                let hash = hex.try_into()?;
+                Ok(Self { nodes, hash })
+            }
+            _ => Err(InvalidObjectFormat(format!(
+                "Expected tree, found {:?} in {}",
+                obj_type, path_display,
+            ))),
+        }
+    }
+
+    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
+        let path = context.obj_path_from_hash(&self.hash);
+        let bytes = self.to_bytes();
+        write_obj_to_file(&bytes, ObjectType::Tree, path).await
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
-pub struct TreeNode {
-    pub(crate) mode: TreeNodeMode,
-    pub(crate) name: String,
-    pub(crate) hash: ContentHash,
-}
-
-#[derive(Debug, Default, PartialEq)]
-pub struct Tree {
-    pub(crate) nodes: Vec<TreeNode>,
-    pub(crate) hash: ContentHash,
-}
-
-impl Object for Tree {}
-
 impl Tree {
-    pub async fn from_file(path: impl AsRef<Path>) -> Result<Tree> {
-        let path_display = path.as_ref().display();
-        let (obj_type, content, hash) = Self::read_obj_from_file(&path).await?;
-        match obj_type {
-            ObjectType::Tree => {}
-            _ => {
-                return Err(InvalidObjectFormat(format!(
-                    "Expected tree, found {:?} in {}",
-                    obj_type, path_display,
-                )));
-            }
-        }
+    pub fn get_nodes(&self) -> &[TreeNode] {
+        &self.nodes
+    }
 
-        debug!("Parsing tree nodes");
+    pub fn set_nodes(&mut self, nodes: Vec<TreeNode>) {
+        self.nodes = nodes;
+        let bytes = self.to_bytes();
+        self.hash = calculate_content_hash(&bytes)
+    }
+
+    fn parse_nodes(content: &[u8]) -> Result<Vec<TreeNode>> {
         let mut parse_idx = 0;
         let content_len = content.len();
         let mut nodes = Vec::new();
@@ -272,11 +301,28 @@ impl Tree {
             nodes.push(node);
         }
 
-        Ok(Tree { nodes, hash })
+        Ok(nodes)
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        let estimated_len = self.nodes.len() * (6 + 1 + 36 + 1 + 20); // assume a file name is on avg 36 bytes
+        let mut bytes: Vec<u8> = Vec::with_capacity(estimated_len);
+
+        for node in &self.nodes {
+            // assume nodes are already sorted by name
+            let mode = node.mode.to_bytes();
+            bytes.extend_from_slice(mode);
+            bytes.push(b' ');
+            bytes.extend_from_slice(node.name.as_bytes());
+            bytes.push(0);
+            bytes.extend_from_slice(&node.hash.value);
+        }
+
+        bytes
     }
 
     fn parse_node(content: &[u8]) -> Result<(TreeNode, usize)> {
-        let (mode, mode_byte_count) = TreeNodeMode::from_bytes(content)?;
+        let (mode, mode_byte_count) = TreeNodeMode::parse(content)?;
         match content.get(mode_byte_count) {
             Some(b' ') => {}
             _ => {
@@ -313,28 +359,10 @@ impl Tree {
                 "Not enough data for hash in tree node".to_string(),
             ));
         }
-        let mut hash = ContentHash::default();
-        hash.copy_from_slice(&content[hash_start_idx..hash_end_idx]);
+        let hash = ContentHash::from_slice(&content[hash_start_idx..hash_end_idx]);
 
         debug!("Found node {name} ({hash_end_idx} bytes)");
         Ok((TreeNode { mode, name, hash }, hash_end_idx))
-    }
-
-    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
-        let estimated_len = self.nodes.len() * (6 + 1 + 36 + 1 + 20); // assume a file name is on avg 36 bytes
-        let mut content: Vec<u8> = Vec::with_capacity(estimated_len);
-
-        for node in &self.nodes {
-            // assume nodes are already sorted by name
-            let mode = node.mode.to_bytes();
-            content.extend_from_slice(mode);
-            content.push(b' ');
-            content.extend_from_slice(node.name.as_bytes());
-            content.push(0);
-            content.extend_from_slice(&node.hash);
-        }
-
-        Self::write_obj_to_file(&content, ObjectType::Tree, path).await
     }
 }
 
@@ -342,37 +370,42 @@ impl Tree {
 
 // region Commit
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct User {
     pub(crate) name: String,
     pub(crate) email: String,
     pub(crate) date_time: DateTime<FixedOffset>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Commit {
-    pub(crate) hash: ContentHash,
-    pub(crate) tree: ContentHash,
-    pub(crate) parents: Vec<ContentHash>,
-    pub(crate) author: User,
-    pub(crate) committer: User,
-    pub(crate) message: String,
+    hash: ContentHash,
+    tree: ContentHash,
+    parents: Vec<ContentHash>,
+    author: User,
+    committer: User,
+    message: String,
 }
 
-impl Object for Commit {}
+impl Object for Commit {
+    fn get_hash(&self) -> &ContentHash {
+        &self.hash
+    }
 
-impl Commit {
-    pub async fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        let (obj_type, content, hash) = Self::read_obj_from_file(path).await?;
+    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
+        let path = context.obj_path_from_hex(hex)?;
+        let path_display = path.display();
+
+        let (obj_type, content) = read_obj_from_file(&path).await?;
         match obj_type {
             ObjectType::Commit => {}
             _ => {
                 return Err(InvalidObjectFormat(format!(
-                    "Expected commit, found {:?}",
-                    obj_type
+                    "Expected commit, found {:?} in {}",
+                    obj_type, path_display,
                 )));
             }
-        }
+        };
 
         let (tree_hash, mut total_read_bytes) = Self::parse_hash(b"tree ", &content)?;
 
@@ -407,7 +440,7 @@ impl Commit {
         let message = String::from_utf8(content[total_read_bytes + 1..content.len() - 1].to_vec())?;
 
         Ok(Commit {
-            hash,
+            hash: hex.try_into()?,
             tree: tree_hash,
             parents: parents_hash,
             author,
@@ -416,6 +449,14 @@ impl Commit {
         })
     }
 
+    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
+        let path = context.obj_path_from_hash(&self.hash);
+        let bytes = self.to_bytes();
+        write_obj_to_file(&bytes, ObjectType::Commit, path).await
+    }
+}
+
+impl Commit {
     fn parse_hash(header: &[u8], content: &[u8]) -> Result<(ContentHash, usize)> {
         if !content.starts_with(header) {
             return Err(InvalidObjectFormat(format!(
@@ -433,14 +474,8 @@ impl Commit {
             )));
         }
 
-        let hash: ContentHash = hex::decode(&content[header_len..end_idx])?
-            .try_into()
-            .map_err(|_| {
-                InvalidObjectFormat(format!(
-                    "Cannot parse header {} of commit object",
-                    String::from_utf8(header.to_vec()).unwrap()
-                ))
-            })?;
+        let hash_str = str::from_utf8(&content[header_len..end_idx])?;
+        let hash = ContentHash::try_from(hash_str)?;
 
         Ok((hash, end_idx + 1))
     }
@@ -518,7 +553,7 @@ impl Commit {
         Ok((user, total_read_bytes))
     }
 
-    pub async fn to_file(&self, path: impl AsRef<Path>) -> Result<()> {
+    fn to_bytes(&self) -> Vec<u8> {
         let mut content = Vec::with_capacity(512); // estimated
 
         Self::write_hash(&mut content, b"tree ", &self.tree);
@@ -532,13 +567,12 @@ impl Commit {
         content.push(b'\n');
         content.extend(self.message.as_bytes());
         content.push(b'\n');
-
-        Self::write_obj_to_file(&content, ObjectType::Commit, path).await
+        content
     }
 
     fn write_hash(buffer: &mut Vec<u8>, header: &[u8], content_hash: &ContentHash) {
         buffer.extend(header);
-        buffer.extend(hex::encode(content_hash).as_bytes());
+        buffer.extend(content_hash.to_string().as_bytes());
         buffer.push(b'\n');
     }
 
@@ -551,5 +585,7 @@ impl Commit {
         buffer.extend(date_str.as_bytes());
     }
 }
+
+// TODO COmmitBuilder
 
 // endregion

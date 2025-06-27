@@ -2,12 +2,12 @@
 
 ## Basic git feature
 
-- [ ] Init git project
-- [ ] Read blob object
-- [ ] Write blob object
-- [ ] Read tree object
-- [ ] Write tree object
-- [ ] Create commit
+- [x] Init git project
+- [x] Read blob object
+- [x] Write blob object
+- [x] Read tree object
+- [x] Write tree object
+- [x] Create commit
 
 ## Basic contribution graph options
 

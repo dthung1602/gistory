@@ -1,3 +1,5 @@
 .idea/
+.fleet/
 /target
 *foo*
+*bar*

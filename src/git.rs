@@ -1,3 +1,7 @@
+pub mod context;
 pub mod error;
+pub mod hash;
 pub mod objects;
-pub use self::error::{Error, Result};
+pub mod prelude;
+
+pub use prelude::*;
