@@ -18,7 +18,14 @@ use crate::git::hash::{
 };
 
 // region Common
-const READ_FILE_BUFFER_SIZE: usize = 4096;
+
+pub trait Object: Sized + PartialEq {
+    fn get_hash(&self) -> &ContentHash;
+
+    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self>;
+
+    async fn write_to_file(&self, context: &GitContext) -> Result<usize>;
+}
 
 #[derive(Debug)]
 pub enum ObjectType {
@@ -36,6 +43,8 @@ impl ObjectType {
         }
     }
 }
+
+const READ_FILE_BUFFER_SIZE: usize = 4096;
 
 async fn read_obj_from_file(path: impl AsRef<Path>) -> Result<(ObjectType, Vec<u8>)> {
     let path_display = path.as_ref().display();
@@ -134,14 +143,6 @@ async fn write_obj_to_file(
         total_written, path_display, compress_ratio
     );
     Ok(total_written as usize)
-}
-
-pub trait Object: Sized + PartialEq {
-    fn get_hash(&self) -> &ContentHash;
-
-    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self>;
-
-    async fn write_to_file(&self, context: &GitContext) -> Result<usize>;
 }
 
 // endregion
