@@ -3,7 +3,7 @@ use sha1::{Digest, Sha1};
 pub const CONTENT_HASH_LEN: usize = 20;
 pub const HEX_CONTENT_HASH_LEN: usize = CONTENT_HASH_LEN * 2;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContentHash {
     pub(crate) value: [u8; CONTENT_HASH_LEN],
 }
@@ -36,13 +36,13 @@ impl TryFrom<&str> for ContentHash {
 
 impl ToString for ContentHash {
     fn to_string(&self) -> String {
-        hex::encode(&self.value)
+        hex::encode(self.value)
     }
 }
 
 pub fn calculate_content_hash(content: &[u8]) -> ContentHash {
     let mut hasher = Sha1::new();
-    hasher.update(&content);
+    hasher.update(content);
     ContentHash {
         value: hasher.finalize().into(),
     }

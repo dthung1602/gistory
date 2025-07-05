@@ -12,19 +12,19 @@ use tokio::io::{AsyncReadExt, BufReader};
 
 use crate::git::Error::InvalidObjectFormat;
 use crate::git::Result;
-use crate::git::context::GitContext;
 use crate::git::hash::{
     CONTENT_HASH_LEN, ContentHash, HEX_CONTENT_HASH_LEN, calculate_content_hash,
 };
+use crate::git::repo::Repo;
 
 // region Common
 
 pub trait Object: Sized + PartialEq {
     fn get_hash(&self) -> &ContentHash;
 
-    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self>;
+    async fn from_hex(hex: &str, repo: &Repo) -> Result<Self>;
 
-    async fn write_to_file(&self, context: &GitContext) -> Result<usize>;
+    async fn write_to_file(&self, repo: &Repo) -> Result<usize>;
 }
 
 #[derive(Debug)]
@@ -172,8 +172,8 @@ impl Object for Blob {
         &self.hash
     }
 
-    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
-        let path = context.obj_path_from_hex(hex)?;
+    async fn from_hex(hex: &str, repo: &Repo) -> Result<Self> {
+        let path = repo.obj_path_from_hex(hex)?;
         let path_display = path.display();
 
         let (obj_type, content) = read_obj_from_file(&path).await?;
@@ -190,9 +190,9 @@ impl Object for Blob {
         }
     }
 
-    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
-        let path = context.obj_path_from_hash(&self.hash);
-        Ok(write_obj_to_file(&self.content, ObjectType::Blob, path).await?)
+    async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
+        let path = repo.obj_path_from_hash(&self.hash);
+        write_obj_to_file(&self.content, ObjectType::Blob, path).await
     }
 }
 
@@ -256,8 +256,8 @@ impl Object for Tree {
         &self.hash
     }
 
-    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
-        let path = context.obj_path_from_hex(hex)?;
+    async fn from_hex(hex: &str, repo: &Repo) -> Result<Self> {
+        let path = repo.obj_path_from_hex(hex)?;
         let path_display = path.display();
 
         let (obj_type, content) = read_obj_from_file(&path).await?;
@@ -274,10 +274,21 @@ impl Object for Tree {
         }
     }
 
-    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
-        let path = context.obj_path_from_hash(&self.hash);
+    async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
+        let path = repo.obj_path_from_hash(&self.hash);
         let bytes = self.to_bytes();
         write_obj_to_file(&bytes, ObjectType::Tree, path).await
+    }
+}
+
+impl Default for Tree {
+    fn default() -> Self {
+        Self {
+            nodes: vec![],
+            hash: "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+                .try_into()
+                .unwrap(),
+        }
     }
 }
 
@@ -371,14 +382,14 @@ impl Tree {
 
 // region Commit
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct User {
     pub(crate) name: String,
     pub(crate) email: String,
     pub(crate) date_time: DateTime<FixedOffset>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Commit {
     hash: ContentHash,
     tree: ContentHash,
@@ -393,8 +404,8 @@ impl Object for Commit {
         &self.hash
     }
 
-    async fn from_hex(hex: &str, context: &GitContext) -> Result<Self> {
-        let path = context.obj_path_from_hex(hex)?;
+    async fn from_hex(hex: &str, repo: &Repo) -> Result<Self> {
+        let path = repo.obj_path_from_hex(hex)?;
         let path_display = path.display();
 
         let (obj_type, content) = read_obj_from_file(&path).await?;
@@ -450,14 +461,34 @@ impl Object for Commit {
         })
     }
 
-    async fn write_to_file(&self, context: &GitContext) -> Result<usize> {
-        let path = context.obj_path_from_hash(&self.hash);
+    async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
+        let path = repo.obj_path_from_hash(&self.hash);
         let bytes = self.to_bytes();
         write_obj_to_file(&bytes, ObjectType::Commit, path).await
     }
 }
 
 impl Commit {
+    pub fn new(
+        tree: ContentHash,
+        parents: Vec<ContentHash>,
+        author: User,
+        committer: User,
+        message: String,
+    ) -> Self {
+        let mut commit = Self {
+            hash: ContentHash::default(),
+            tree,
+            parents,
+            author,
+            committer,
+            message,
+        };
+        let bytes = commit.to_bytes();
+        commit.hash = calculate_content_hash(&bytes);
+        commit
+    }
+
     fn parse_hash(header: &[u8], content: &[u8]) -> Result<(ContentHash, usize)> {
         if !content.starts_with(header) {
             return Err(InvalidObjectFormat(format!(
@@ -586,7 +617,5 @@ impl Commit {
         buffer.extend(date_str.as_bytes());
     }
 }
-
-// TODO COmmitBuilder
 
 // endregion

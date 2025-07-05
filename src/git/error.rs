@@ -16,6 +16,7 @@ pub enum Error {
     // Internal error
     #[from]
     InvalidObjectFormat(String),
+    InvalidRepoConfig(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

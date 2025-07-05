@@ -13,7 +13,7 @@
 
 - [ ] Read input file
 - [ ] Calculate levels
-- [ ] Generate commits
+- [x] Generate commits
 
 ## Webserver
 
