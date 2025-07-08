@@ -2,12 +2,13 @@ use std::fmt::{Debug, Display, Formatter};
 
 use derive_more::From;
 
-use crate::git::Error as GitError;
+use crate::git::error::Error as GitError;
 
 #[derive(From, Debug)]
 pub enum Error {
     #[from]
     Git(GitError),
+    InvalidArg(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

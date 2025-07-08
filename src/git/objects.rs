@@ -10,8 +10,8 @@ use flate2::write::{ZlibDecoder, ZlibEncoder};
 use log::debug;
 use tokio::io::{AsyncReadExt, BufReader};
 
-use crate::git::Error::InvalidObjectFormat;
-use crate::git::Result;
+use crate::git::error::Error::InvalidObjectFormat;
+use crate::git::error::Result;
 use crate::git::hash::{
     CONTENT_HASH_LEN, ContentHash, HEX_CONTENT_HASH_LEN, calculate_content_hash,
 };
@@ -115,11 +115,16 @@ async fn read_obj_from_file(path: impl AsRef<Path>) -> Result<(ObjectType, Vec<u
     Ok((obj_type, content))
 }
 
-async fn write_obj_to_file(
-    content: &[u8],
-    obj_type: ObjectType,
-    path: impl AsRef<Path>,
-) -> Result<usize> {
+fn format_content(content: &[u8], obj_type: ObjectType) -> (Vec<u8>, ContentHash) {
+    let mut formatted_content: Vec<u8> = Vec::with_capacity(content.len() + 32);
+    formatted_content.extend_from_slice(obj_type.header());
+    formatted_content.extend_from_slice(format!("{}\0", content.len()).as_bytes());
+    formatted_content.extend_from_slice(content);
+    let hash = calculate_content_hash(&formatted_content);
+    (formatted_content, hash)
+}
+
+async fn write_obj_to_file(formatted_content: &[u8], path: impl AsRef<Path>) -> Result<usize> {
     // TODO make this true async
     let path_display = path.as_ref().display();
     debug!("Writing object to file {path_display}");
@@ -128,19 +133,17 @@ async fn write_obj_to_file(
     let parent = path.as_ref().parent().unwrap();
     tokio::fs::create_dir_all(parent).await?;
 
+    // write zlib compressed data
     let file = std::fs::File::create(&path)?;
     let writer = std::io::BufWriter::new(file);
     let mut encoder = ZlibEncoder::new(writer, flate2::Compression::default());
-    encoder.write_all(obj_type.header())?;
-    encoder.write_all(format!("{}\0", content.len()).as_bytes())?;
-    encoder.write_all(content)?;
+    encoder.write_all(formatted_content)?;
     encoder.flush()?;
     let total_written = encoder.total_out();
     let compress_ratio = 100.0 - 100.0 * total_written as f64 / encoder.total_in() as f64;
     encoder.finish()?;
     debug!(
-        "Done writing {} bytes to file {}. Compress ratio {:.2}%",
-        total_written, path_display, compress_ratio
+        "Done writing {total_written} bytes to file {path_display}. Compress ratio {compress_ratio:.2}%"
     );
     Ok(total_written as usize)
 }
@@ -156,14 +159,13 @@ pub struct Blob {
 }
 
 impl Blob {
-    pub fn get_content(&self) -> &[u8] {
-        &self.content
+    pub fn new(content: Vec<u8>) -> Self {
+        let (_, hash) = format_content(&content, ObjectType::Blob);
+        Self { content, hash }
     }
 
-    pub fn set_content(&mut self, content: &[u8]) {
-        self.content.resize(content.len(), 0);
-        self.content.copy_from_slice(content);
-        self.hash = calculate_content_hash(&self.content)
+    pub fn get_content(&self) -> &[u8] {
+        &self.content
     }
 }
 
@@ -184,15 +186,15 @@ impl Object for Blob {
                 Ok(Self { content, hash })
             }
             _ => Err(InvalidObjectFormat(format!(
-                "Expected blob, found {:?} in {}",
-                obj_type, path_display
+                "Expected blob, found {obj_type:?} in {path_display}"
             ))),
         }
     }
 
     async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
         let path = repo.obj_path_from_hash(&self.hash);
-        write_obj_to_file(&self.content, ObjectType::Blob, path).await
+        let (formatted_content, _) = format_content(&self.content, ObjectType::Blob);
+        write_obj_to_file(&formatted_content, path).await
     }
 }
 
@@ -268,16 +270,16 @@ impl Object for Tree {
                 Ok(Self { nodes, hash })
             }
             _ => Err(InvalidObjectFormat(format!(
-                "Expected tree, found {:?} in {}",
-                obj_type, path_display,
+                "Expected tree, found {obj_type:?} in {path_display}",
             ))),
         }
     }
 
     async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
         let path = repo.obj_path_from_hash(&self.hash);
-        let bytes = self.to_bytes();
-        write_obj_to_file(&bytes, ObjectType::Tree, path).await
+        let bytes = Self::nodes_to_bytes(&self.nodes);
+        let (formated_content, _) = format_content(&bytes, ObjectType::Tree);
+        write_obj_to_file(&formated_content, path).await
     }
 }
 
@@ -293,14 +295,14 @@ impl Default for Tree {
 }
 
 impl Tree {
-    pub fn get_nodes(&self) -> &[TreeNode] {
-        &self.nodes
+    pub fn new(nodes: Vec<TreeNode>) -> Self {
+        let bytes = Self::nodes_to_bytes(&nodes);
+        let (_, hash) = format_content(&bytes, ObjectType::Tree);
+        Self { nodes, hash }
     }
 
-    pub fn set_nodes(&mut self, nodes: Vec<TreeNode>) {
-        self.nodes = nodes;
-        let bytes = self.to_bytes();
-        self.hash = calculate_content_hash(&bytes)
+    pub fn get_nodes(&self) -> &[TreeNode] {
+        &self.nodes
     }
 
     fn parse_nodes(content: &[u8]) -> Result<Vec<TreeNode>> {
@@ -316,11 +318,11 @@ impl Tree {
         Ok(nodes)
     }
 
-    fn to_bytes(&self) -> Vec<u8> {
-        let estimated_len = self.nodes.len() * (6 + 1 + 36 + 1 + 20); // assume a file name is on avg 36 bytes
+    fn nodes_to_bytes(nodes: &[TreeNode]) -> Vec<u8> {
+        let estimated_len = nodes.len() * (6 + 1 + 36 + 1 + 20); // assume a file name is on avg 36 bytes
         let mut bytes: Vec<u8> = Vec::with_capacity(estimated_len);
 
-        for node in &self.nodes {
+        for node in nodes {
             // assume nodes are already sorted by name
             let mode = node.mode.to_bytes();
             bytes.extend_from_slice(mode);
@@ -384,9 +386,9 @@ impl Tree {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct User {
-    pub(crate) name: String,
-    pub(crate) email: String,
-    pub(crate) date_time: DateTime<FixedOffset>,
+    pub name: String,
+    pub email: String,
+    pub date_time: DateTime<FixedOffset>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -413,8 +415,7 @@ impl Object for Commit {
             ObjectType::Commit => {}
             _ => {
                 return Err(InvalidObjectFormat(format!(
-                    "Expected commit, found {:?} in {}",
-                    obj_type, path_display,
+                    "Expected commit, found {obj_type:?} in {path_display}",
                 )));
             }
         };
@@ -464,7 +465,8 @@ impl Object for Commit {
     async fn write_to_file(&self, repo: &Repo) -> Result<usize> {
         let path = repo.obj_path_from_hash(&self.hash);
         let bytes = self.to_bytes();
-        write_obj_to_file(&bytes, ObjectType::Commit, path).await
+        let (formatted_content, _) = format_content(&bytes, ObjectType::Commit);
+        write_obj_to_file(&formatted_content, path).await
     }
 }
 
@@ -485,7 +487,8 @@ impl Commit {
             message,
         };
         let bytes = commit.to_bytes();
-        commit.hash = calculate_content_hash(&bytes);
+        let (_, hash) = format_content(&bytes, ObjectType::Commit);
+        commit.hash = hash;
         commit
     }
 

@@ -4,11 +4,14 @@ use chrono::{FixedOffset, NaiveDate, TimeZone};
 use log::debug;
 use tokio::fs;
 
-use super::{Commit, ContentHash, Error, Object, Result, Tree};
+use super::error::{Error, Result};
+use super::hash::ContentHash;
+use super::objects::{Commit, Object, Tree};
 use crate::git::objects::User;
 
 const CONFIG_FILE_CONTENT: &str = "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n";
 
+#[derive(Debug)]
 pub struct Repo {
     pub path: PathBuf,
     pub default_branch: String,
@@ -129,7 +132,6 @@ impl Repo {
 
         let ref_master_path = self.git_directory().join("refs/heads/master");
         let hash_str = commit.get_hash().to_string();
-        debug!("First commit: {hash_str}");
         fs::write(ref_master_path, format!("{hash_str}\n")).await?;
 
         self.commits.push(commit);
