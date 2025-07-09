@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Display, Formatter};
+use std::io;
 
 use derive_more::From;
 
@@ -8,7 +9,10 @@ use crate::git::error::Error as GitError;
 pub enum Error {
     #[from]
     Git(GitError),
+    #[from]
+    Io(io::Error),
     InvalidArg(String),
+    InvalidData(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
