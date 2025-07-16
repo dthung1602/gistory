@@ -1,8 +1,10 @@
 use std::path::Path;
 
-use chrono::NaiveDate;
-use log::info;
+use chrono::{Datelike, NaiveDate, Weekday};
+use log::{info, warn};
 use rand::Rng;
+use tokio::fs;
+use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::error::{Error, Result};
 use crate::git::repo::Repo;
@@ -51,6 +53,11 @@ impl CommitGrid {
     }
 
     pub fn new(start_date: NaiveDate) -> Self {
+        if start_date.weekday() != Weekday::Sun {
+            warn!(
+                "{start_date} is not a Sunday. Github starts a week on Sunday, so start_date should be a Sunday as well."
+            )
+        }
         Self {
             start_date,
             data: vec![],
@@ -102,8 +109,6 @@ impl CommitGrid {
         // file format: a grid consist of 0 1 2 3 4 represent CommitCount
         // there must be <= 7 rows (represent 7 days in week).
         // if rows < 7, fill the remaining rows with 0
-        use tokio::fs;
-        use tokio::io::{AsyncBufReadExt, BufReader};
 
         let file = fs::File::open(path).await?;
         let reader = BufReader::new(file);
