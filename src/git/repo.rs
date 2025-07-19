@@ -130,7 +130,10 @@ impl Repo {
         let commit = Commit::new(tree_hash, parents, author, committer, message);
         commit.write_to_file(self).await?;
 
-        let ref_master_path = self.git_directory().join("refs/heads/master");
+        let ref_master_path = self
+            .git_directory()
+            .join("refs/heads/")
+            .join(&self.default_branch);
         let hash_str = commit.get_hash().to_string();
         fs::write(ref_master_path, format!("{hash_str}\n")).await?;
 

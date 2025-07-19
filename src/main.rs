@@ -69,15 +69,15 @@ async fn main() -> error::Result<()> {
             arg!(-r --"random" "Fill all days with random number of commits").action(ArgAction::SetTrue)
         )
         .arg(
-            arg!(-p --"pattern-file" "Draw pattern from file. File format: text file contains character from 0->4 on less than 7 lines. 0 means no commit, 4 means lots of commits")
+            arg!(-p --"pattern-file" <PATTERN> "Draw pattern from file. File format: text file contains character from 0->4 on less than 7 lines. 0 means no commit, 4 means lots of commits")
                 .value_parser(value_parser!(PathBuf))
         )
         .arg(
-            arg!(-i --"image" "Draw image. Image will be re-scaled to 7-pixel height and turned to grayscale")
+            arg!(-i --"image" <IMAGE> "Draw image. Image will be re-scaled to 7-pixel height and turned to grayscale")
                 .value_parser(value_parser!(PathBuf))
         )
         .arg(
-            arg!(-t --"text" "Print given text on grid")
+            arg!(-t --"text" <TEXT> "Print given text on grid")
         )
         .group(
             ArgGroup::new("method").args(["full", "random", "pattern-file", "image", "text"]).required(true).multiple(false)
