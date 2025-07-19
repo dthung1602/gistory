@@ -1,16 +1,19 @@
 use std::path::Path;
 
 use chrono::{Datelike, NaiveDate, Weekday};
+use image::{GenericImageView, imageops};
 use log::{info, warn};
 use rand::Rng;
 use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::error::{Error, Result};
 use crate::git::repo::Repo;
 use crate::utils::DateRangeIter;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum)]
 pub enum CommitCount {
     Zero = 0,
     Few = 1,
@@ -31,6 +34,7 @@ impl CommitCount {
     }
 }
 
+#[derive(Debug)]
 pub struct CommitGrid {
     start_date: NaiveDate,
     data: Vec<CommitCount>, // store data by date. data[0] is start_date, data[1] is start_date + 1, etc
@@ -104,7 +108,7 @@ impl CommitGrid {
         Ok(())
     }
 
-    pub async fn read_text_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
+    pub async fn read_pattern_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
         // read a file and populate self.data accordingly
         // file format: a grid consist of 0 1 2 3 4 represent CommitCount
         // there must be <= 7 rows (represent 7 days in week).
@@ -152,8 +156,8 @@ impl CommitGrid {
         }
 
         for c in 0..max_len {
-            for r in 0..grid.len() {
-                self.data.push(grid[r][c])
+            for row in grid.iter() {
+                self.data.push(row[c])
             }
         }
 
@@ -163,9 +167,6 @@ impl CommitGrid {
     pub async fn read_image_file(&mut self, path: impl AsRef<Path>) -> Result<()> {
         // read an image (jpeg, png, etc) -> convert to black and white -> resize to 7 pixel rows (keep the aspect ratio)
         // -> convert each pixel to CommitCount using the pixel brightness
-        use image::{GenericImageView, ImageBuffer, Luma, imageops};
-        use tokio::fs::File;
-        use tokio::io::AsyncReadExt;
 
         // Read the image file
         let mut file = File::open(path).await?;
@@ -174,7 +175,7 @@ impl CommitGrid {
 
         // Load the image
         let img = image::load_from_memory(&buffer)
-            .map_err(|e| Error::InvalidData(format!("Failed to load image: {}", e)))?;
+            .map_err(|e| Error::InvalidData(format!("Failed to load image: {e}")))?;
 
         // Convert to grayscale
         let grayscale = img.grayscale();
@@ -216,7 +217,7 @@ impl CommitGrid {
         Ok(())
     }
 
-    pub async fn show_text(&mut self, text: String) -> Result<()> {
+    pub fn show_text(&mut self, text: String) -> Result<()> {
         todo!()
     }
 }

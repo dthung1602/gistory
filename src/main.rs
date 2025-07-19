@@ -3,80 +3,133 @@ mod git;
 mod utils;
 mod visualizer;
 
-use chrono::{FixedOffset, NaiveDate};
-use log::info;
+use std::path::PathBuf;
 
-use crate::visualizer::CommitCount;
-// const FILE: &str = "8c0bf1b1f3ef6e2c4486f309728936757be620bd";
-// const TREE: &str = "223b8d2067d7f7f85918df7330db12dc0528da2a";
-// const COMMIT: &str = "721b138c039c9dfa3d4d81d29c55bf6a81452020";
+use clap::{ArgAction, ArgGroup, Command, arg, value_parser};
+use log::debug;
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
     env_logger::init();
-    info!("--> START <--");
 
-    let start_date = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-    let end_date = NaiveDate::from_ymd_opt(2025, 1, 7).unwrap();
+    let cwd = std::env::current_dir()?.into_os_string();
+    let local_tz = chrono::Local::now().format("%z").to_string();
+    let default_username = git::utils::get_global_config("user.name")?;
+    let default_email = git::utils::get_global_config("user.email")?;
 
-    let time_zone = FixedOffset::west_opt(0).unwrap(); // github uses UTC
-    let default_branch = "master";
-    let user_name = "john";
-    let email = "abc@example.com";
+    let matches = Command::new("gistory")
+        .version("0.1.0")
+        .about("A tool to draw on GitHub commit graph")
+        .arg(
+            arg!(-n --"repo-name" <REPOSITORY_NAME> "Repo name.").default_value("gistory")
+        )
+        .arg(
+            arg!(-w --"working-dir" <WORKING_DIR> "Working directory. Default to cwd.")
+                .value_parser(value_parser!(PathBuf))
+                .default_value(cwd)
+        )
+        .arg(
+            arg!(-u --"user-name" <USER_NAME> "Git username. Default to global git config.")
+                .default_value(default_username)
+        )
+        .arg(
+            arg!(-m --"email" <EMAIL> "Git user email. This must match GitHub email. Default to global git config.")
+                .default_value(default_email)
+        )
+        .arg(
+            arg!(-b --"branch" <BRANCH_NAME> "Branch name. Default to `master`")
+                .default_value("master")
+        )
+        .arg(
+            arg!(-z --"time-zone" <TIME_ZONE> "Time zone in format +-HHMM. Defaults to local timezone.")
+                .value_parser(value_parser!(chrono::FixedOffset))
+                .default_value(local_tz)
+        )
+        .arg(
+            arg!(-s --"start-date" <START_DATE> "Start date. Format YYYY-mm-dd.").required(true)
+                .value_parser(value_parser!(chrono::NaiveDate))
+        )
+        .arg(
+            arg!(-e --"end-date" <END_DATE> "End date. Format YYYY-mm-dd.").required(false)
+                .value_parser(value_parser!(chrono::NaiveDate))
+                .required_if_eq_any([
+                    ("full", "true"),
+                    ("random", "true")
+                ])
+        )
+        .arg(
+            arg!(-c --"commit-count" <COMMIT_COUNT> "Commit count").required(false)
+                .value_parser(value_parser!(visualizer::CommitCount))
+                .required_if_eq("full", "true")
+        )
+        .arg(
+            arg!(-f --"full" "Fill all days with the same number of commits").action(ArgAction::SetTrue)
+        )
+        .arg(
+            arg!(-r --"random" "Fill all days with random number of commits").action(ArgAction::SetTrue)
+        )
+        .arg(
+            arg!(-p --"pattern-file" "Draw pattern from file. File format: text file contains character from 0->4 on less than 7 lines. 0 means no commit, 4 means lots of commits")
+                .value_parser(value_parser!(PathBuf))
+        )
+        .arg(
+            arg!(-i --"image" "Draw image. Image will be re-scaled to 7-pixel height and turned to grayscale")
+                .value_parser(value_parser!(PathBuf))
+        )
+        .arg(
+            arg!(-t --"text" "Print given text on grid")
+        )
+        .group(
+            ArgGroup::new("method").args(["full", "random", "pattern-file", "image", "text"]).required(true).multiple(false)
+        )
+        .get_matches();
 
-    let cwd = std::env::current_dir().unwrap();
+    let start_date = matches.get_one::<chrono::NaiveDate>("start-date").unwrap();
+    let mut grid = visualizer::CommitGrid::new(*start_date);
 
-    let mut his_repo = git::repo::Repo::new(
-        cwd.join("his"),
-        default_branch.to_string(),
-        time_zone,
-        user_name.to_string(),
-        email.to_string(),
+    if matches.get_flag("full") {
+        let end_date = matches.get_one::<chrono::NaiveDate>("end-date").unwrap();
+        let commit_count = matches
+            .get_one::<visualizer::CommitCount>("commit-count")
+            .unwrap();
+        grid.full(*commit_count, *end_date)?;
+    } else if matches.get_flag("random") {
+        let end_date = matches.get_one::<chrono::NaiveDate>("end-date").unwrap();
+        grid.random(*end_date)?;
+    } else if matches.contains_id("pattern-file") {
+        let pattern_file = matches.get_one::<PathBuf>("pattern-file").unwrap();
+        grid.read_pattern_file(pattern_file).await?;
+    } else if matches.contains_id("image") {
+        let image = matches.get_one::<PathBuf>("image").unwrap();
+        grid.read_image_file(image).await?;
+    } else if matches.contains_id("text") {
+        let text = matches.get_one::<String>("text").unwrap();
+        grid.show_text(text.clone())?;
+    } else {
+        unreachable!("No method flag provided");
+    };
+    debug!("Grid: {grid:?}");
+
+    let working_dir = matches.get_one::<PathBuf>("working-dir").unwrap();
+    let repo_name = matches.get_one::<String>("repo-name").unwrap();
+    let repo_path = working_dir.join(repo_name);
+
+    let branch = matches.get_one::<String>("branch").unwrap();
+    let time_zone = matches.get_one::<chrono::FixedOffset>("time-zone").unwrap();
+    let user_name = matches.get_one::<String>("user-name").unwrap();
+    let email = matches.get_one::<String>("email").unwrap();
+
+    let mut repo = git::repo::Repo::new(
+        repo_path,
+        branch.clone(),
+        *time_zone,
+        user_name.clone(),
+        email.clone(),
     );
+    debug!("Repo: {repo:?}");
+    repo.init().await?;
+    grid.populate_repo(&mut repo).await?;
 
-    his_repo.init().await?;
-
-    let mut grid = visualizer::CommitGrid::new(start_date);
-    grid.full(CommitCount::Many, end_date)?;
-
-    grid.populate_repo(&mut his_repo).await?;
-
-    // let foo = cwd.join("foo");
-    // let bar = cwd.join("bar");
-
-    // let foo_repo = Repo::new(
-    //     foo,
-    //     default_branch.to_string(),
-    //     time_zone.clone(),
-    //     user_name.to_string(),
-    //     email.to_string(),
-    // );
-    // let bar_repo = Repo::new(
-    //     bar,
-    //     default_branch.to_string(),
-    //     time_zone,
-    //     user_name.to_string(),
-    //     email.to_string(),
-    // );
-    //
-    // let blob = Blob::from_hex(FILE, &foo_repo).await?;
-    // blob.write_to_file(&bar_repo).await?;
-    //
-    // let new_blob = Blob::from_hex(FILE, &bar_repo).await?;
-    // assert_eq!(blob, new_blob);
-    //
-    // let tree = Tree::from_hex(TREE, &foo_repo).await?;
-    // tree.write_to_file(&bar_repo).await?;
-    //
-    // let new_tree = Tree::from_hex(TREE, &bar_repo).await?;
-    // assert_eq!(tree, new_tree);
-    //
-    // let commit = Commit::from_hex(COMMIT, &foo_repo).await?;
-    // commit.write_to_file(&bar_repo).await?;
-    //
-    // let new_commit = Commit::from_hex(COMMIT, &bar_repo).await?;
-    // assert_eq!(commit, new_commit);
-
-    info!("--> DONE <--");
+    debug!("Done");
     Ok(())
 }
