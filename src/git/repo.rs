@@ -98,7 +98,7 @@ impl Repo {
     }
 
     pub async fn add_commit(&mut self, date: NaiveDate) -> Result<()> {
-        let naive_date_time = date.and_hms_opt(0, 0, 0).unwrap();
+        let naive_date_time = date.and_hms_opt(11, 11, 11).unwrap();
         let Some(date_time) = self
             .time_zone
             .from_local_datetime(&naive_date_time)

@@ -60,7 +60,12 @@ async fn main() -> error::Result<()> {
         .arg(
             arg!(-c --"commit-count" <COMMIT_COUNT> "Commit count").required(false)
                 .value_parser(value_parser!(visualizer::CommitCount))
-                .required_if_eq("full", "true")
+                .default_value("many")
+        )
+        .arg(
+            arg!(--"font" <FONT> "Font for text").required(false)
+                .value_parser(value_parser!(visualizer::Font))
+                .default_value("subway-tracker")
         )
         .arg(
             arg!(-f --"full" "Fill all days with the same number of commits").action(ArgAction::SetTrue)
@@ -104,7 +109,11 @@ async fn main() -> error::Result<()> {
         grid.read_image_file(image).await?;
     } else if matches.contains_id("text") {
         let text = matches.get_one::<String>("text").unwrap();
-        grid.show_text(text.clone())?;
+        let font = matches.get_one::<visualizer::Font>("font").unwrap();
+        let commit_count = matches
+            .get_one::<visualizer::CommitCount>("commit-count")
+            .unwrap();
+        grid.show_text(text.clone(), *font, *commit_count)?;
     } else {
         unreachable!("No method flag provided");
     };
