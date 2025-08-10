@@ -6,7 +6,15 @@ edition = "2024"
 [dependencies]
 axum = "0.8.4"
 axum-extra = "0.10.1"
+axum-valid = "0.24.0"
+chrono = { version = "0.4.41", features = ["serde"] }
 env_logger = "0.11.8"
+gistory = { version = "0.1.0", path = "../gistory" }
 logging = "0.1.0"
+mime = "0.3.17"
+regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.142"
 tokio = { version = "1.47.1", features = ["fs", "macros", "rt-multi-thread"] }
+tower-http = { version = "0.6.6", features = ["fs", "compression-full"] }
+validator = { version = "0.20.0", features = ["derive"] }

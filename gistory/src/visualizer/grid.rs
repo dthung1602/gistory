@@ -4,6 +4,7 @@ use chrono::{Datelike, NaiveDate, Weekday};
 use image::{GenericImageView, imageops};
 use log::{info, warn};
 use rand::Rng;
+use serde::Deserialize;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -14,7 +15,7 @@ use crate::git::repo::Repo;
 use crate::utils::DateRangeIter;
 use crate::visualizer::font::{CHAR_HEIGHT, Char, Font, Pixel};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Deserialize)]
 pub enum CommitCount {
     Zero = 0,
     Few = 1,

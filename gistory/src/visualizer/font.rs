@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use super::font_subway_tracker::CHARS_MAPPING as SUBWAY_TRACKER_MAPPING;
 
 pub const CHAR_HEIGHT: usize = 7;
@@ -35,7 +37,7 @@ impl Char {
     }
 }
 
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+#[derive(Debug, Clone, Copy, clap::ValueEnum, Deserialize)]
 pub enum Font {
     SubwayTracker,
 }
