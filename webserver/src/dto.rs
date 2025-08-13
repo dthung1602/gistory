@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use chrono::{DateTime, FixedOffset};
 use gistory::visualizer::{CommitCount, Font};
 use regex::Regex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
 static NAME_REGEX: LazyLock<Regex> =
@@ -13,35 +13,35 @@ static BRANCH_REGEX: LazyLock<Regex> =
 
 #[derive(Clone, Debug, Deserialize)]
 pub enum RepoVisualizeMethod {
-    Full,
-    Random,
-    PatternFile,
-    Image,
-    Text,
+    Full = 0,
+    Random = 1,
+    PatternFile = 2,
+    Image = 3,
+    Text = 4,
 }
 
 #[derive(Clone, Debug, Validate, Deserialize)]
 #[validate(schema(function = "validate_create_repo_dto", skip_on_field_errors = true))]
 pub struct CreateRepoDto {
     #[validate(regex(path = *NAME_REGEX))]
-    name: String,
+    pub name: String,
     #[validate(regex(path = *NAME_REGEX))]
-    username: String,
+    pub username: String,
     #[validate(email)]
-    email: String,
+    pub email: String,
     #[validate(regex(path = *BRANCH_REGEX))]
-    branch: String,
+    pub branch: String,
 
-    method: RepoVisualizeMethod,
+    pub method: RepoVisualizeMethod,
 
-    start_date: DateTime<FixedOffset>,
-    end_date: Option<DateTime<FixedOffset>>,
-    commit_count: Option<CommitCount>,
-    font: Option<Font>,
+    pub start_date: DateTime<FixedOffset>,
+    pub end_date: Option<DateTime<FixedOffset>>,
+    pub commit_count: Option<CommitCount>,
+    pub font: Option<Font>,
     #[validate(length(equal = 36))]
-    input_file: Option<String>,
+    pub input_file: Option<String>,
     #[validate(length(min = 1, max = 64))]
-    text: Option<String>,
+    pub text: Option<String>,
 }
 
 pub fn validate_create_repo_dto(create_repo_dto: &CreateRepoDto) -> Result<(), ValidationError> {
@@ -85,4 +85,11 @@ pub fn validate_create_repo_dto(create_repo_dto: &CreateRepoDto) -> Result<(), V
     }
 
     Ok(())
+}
+
+#[derive(Serialize, Debug)]
+pub struct UploadResult {
+    pub uuid: String,
+    pub content_type: String,
+    pub size: usize,
 }
