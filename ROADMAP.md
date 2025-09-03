@@ -11,23 +11,23 @@
 
 ## Basic contribution graph options
 
-- [ ] Read input file
-- [ ] Calculate levels
+- [x] Read input file
+- [x] Calculate levels
 - [x] Generate commits
 
 ## Webserver
 
-- [ ] Basic setup
-- [ ] API design:
-    - [ ] Submit task
-    - [ ] Check status
-    - [ ] Download
+- [x] Basic setup
+- [x] API design:
+    - [x] Submit task
+    - [x] Check status
+    - [x] Download
 
 ## Frontend
 
-- [ ] Select tech stack
-- [ ] Bootstrap
-- [ ] Design (use magicpatterns.com?)
+- [x] Select tech stack
+- [x] Bootstrap
+- [x] Design (use magicpatterns.com?)
 - [ ] Implementation
     - [ ] Landing page
     - [ ] Draw pattern
