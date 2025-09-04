@@ -1,4 +1,6 @@
 import * as React from "react";
+import Preview from "./Preview.tsx";
+import { CommitCount } from "../constants.ts";
 
 type Prop = {
   title: string;
@@ -17,12 +19,45 @@ function PatternInput({ title, subtitle, children }: Prop) {
           {children}
         </div>
 
-        <div className="card-actions">
-          <button className="btn btn-secondary">Generate</button>
+        <Preview startDate={new Date()} data={mockData} />
+
+        <div className="card-actions justify-center">
+          <button className="btn btn-secondary">Generate Repo</button>
         </div>
       </div>
     </div>
   );
 }
+
+const mockData = [
+  CommitCount.ALot,
+  CommitCount.ALot,
+  CommitCount.Many,
+  CommitCount.Many,
+  CommitCount.Zero,
+  CommitCount.Few,
+  CommitCount.Some,
+  //
+  CommitCount.Some,
+  CommitCount.Zero,
+  CommitCount.ALot,
+  CommitCount.Few,
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.ALot,
+  //
+  CommitCount.Some,
+  CommitCount.ALot,
+  CommitCount.Many,
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.Few,
+  CommitCount.Many,
+  //
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.ALot,
+  CommitCount.Many,
+];
 
 export default PatternInput;
