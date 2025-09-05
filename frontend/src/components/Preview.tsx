@@ -9,6 +9,8 @@ type Prop = {
 
 type Cell = string | { cellLabel: string; commitCount: CommitCount };
 
+const COMMIT_COUNT_VALS = [null, ...Object.values(CommitCount)];
+
 function getColorForCommit(count: CommitCount | null): string {
   switch (count) {
     case CommitCount.Zero:
@@ -46,6 +48,7 @@ function Preview({ startDate, data }: Prop) {
       if (i % 7 == 0) {
         if (currentMonth != lastMonth && date.getDate() < 16) {
           cells.push(monthFormater.format(date));
+          lastMonth = currentMonth;
         } else {
           cells.push("");
         }
@@ -55,7 +58,6 @@ function Preview({ startDate, data }: Prop) {
       const cellLabel: string = `${commitCount || "No"} commits on ${dateFormater.format(date)}`;
       cells.push({ cellLabel, commitCount });
 
-      lastMonth = currentMonth;
       date.setDate(date.getDate() + 1);
     }
 
@@ -64,41 +66,60 @@ function Preview({ startDate, data }: Prop) {
 
   return (
     <div className="mb-4 flex flex-col items-start">
-      <h2 className="font-bold text-lg mb-4">Preview</h2>
-      <div
-        className="grid grid-rows-8 grid-flow-col gap-2"
-        aria-label="commit-graph"
-      >
-        <div></div>
-        <div></div>
-        <div className="mr-2 font-bold">Mon</div>
-        <div></div>
-        <div className="mr-2 font-bold">Wed</div>
-        <div></div>
-        <div className="mr-2 font-bold">Fri</div>
-        <div></div>
-        {cells.map((cell, idx) => {
-          if (isString(cell)) {
-            console.log(cell);
-            return (
-              <div key={idx} className="w-5 h-5 font-bold whitespace-nowrap">
-                {cell}
-              </div>
-            );
-          }
+      <h2 className="font-bold text-lg mb-2">Preview</h2>
+      <div className="pb-4 pt-2 pl-4 mb-2 overflow-x-scroll w-full">
+        <div
+          className="grid grid-rows-8 grid-flow-col gap-2"
+          aria-label="commit-graph"
+        >
+          <div></div>
+          <div></div>
+          <div className="mr-2 font-bold">Mon</div>
+          <div></div>
+          <div className="mr-2 font-bold">Wed</div>
+          <div></div>
+          <div className="mr-2 font-bold">Fri</div>
+          <div></div>
+          {cells.map((cell, idx) => {
+            if (isString(cell)) {
+              return (
+                <div key={idx} className="w-5 h-5 font-bold whitespace-nowrap">
+                  {cell}
+                </div>
+              );
+            }
 
-          const isFilled = cell.commitCount !== null;
-          const colorClass = getColorForCommit(cell.commitCount);
-          const borderClass = isFilled ? "border border-black/0" : "border";
-          return (
+            const isFilled = cell.commitCount !== null;
+            const colorClass = getColorForCommit(cell.commitCount);
+            const borderClass = isFilled ? "border border-black/0" : "border";
+            return (
+              <div
+                key={idx}
+                className={`w-5 h-5 rounded-sm tooltip tooltip-info foo hover:scale-110 hover:z-10
+                      cursor-pointer transition-colors duration-250 ${colorClass} ${borderClass}`}
+                data-tip={cell.cellLabel}
+              />
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex justify-between w-full text-info">
+        <a
+          className="hover:underline"
+          href="https://docs.github.com/articles/why-are-my-contributions-not-showing-up-on-my-profile"
+        >
+          How GitHub calculate contribution?
+        </a>
+        <div className="flex gap-1">
+          Less &nbsp;
+          {COMMIT_COUNT_VALS.map((commit) => (
             <div
-              key={idx}
-              className={`w-5 h-5 rounded-sm tooltip tooltip-info ${colorClass} ${borderClass} transition-colors duration-150`}
-              // title={cell.cellLabel}
-              data-tip={cell.cellLabel}
+              key={"" + commit}
+              className={`w-5 h-5 inline-block rounded-sm border ${getColorForCommit(commit)}`}
             />
-          );
-        })}
+          ))}
+          &nbsp; More
+        </div>
       </div>
     </div>
   );

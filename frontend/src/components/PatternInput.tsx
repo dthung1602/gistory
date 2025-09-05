@@ -8,6 +8,8 @@ type Prop = {
   children: React.ReactNode;
 };
 
+const today = new Date();
+
 function PatternInput({ title, subtitle, children }: Prop) {
   return (
     <div className="card bg-neutral text-neutral-content shadow-sm">
@@ -19,7 +21,7 @@ function PatternInput({ title, subtitle, children }: Prop) {
           {children}
         </div>
 
-        <Preview startDate={new Date()} data={mockData} />
+        <Preview startDate={today} data={mockData} />
 
         <div className="card-actions justify-center">
           <button className="btn btn-secondary">Generate Repo</button>
@@ -29,7 +31,7 @@ function PatternInput({ title, subtitle, children }: Prop) {
   );
 }
 
-const mockData = [
+let mockData = [
   CommitCount.ALot,
   CommitCount.ALot,
   CommitCount.Many,
@@ -59,5 +61,8 @@ const mockData = [
   CommitCount.ALot,
   CommitCount.Many,
 ];
+
+mockData = [...mockData, ...mockData, ...mockData, ...mockData, ...mockData];
+mockData = [...mockData, ...mockData];
 
 export default PatternInput;
