@@ -1,5 +1,3 @@
-import "./Header.css";
-
 function Header() {
   return (
     <div className="hero my-8">

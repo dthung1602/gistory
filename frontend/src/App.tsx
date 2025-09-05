@@ -5,6 +5,7 @@ import TextFilePattern from "./components/TextFilePattern.tsx";
 import Image from "./components/Image.tsx";
 import Text from "./components/Text.tsx";
 import Header from "./components/Header.tsx";
+import Footer from "./components/Footer.tsx";
 
 const tabs = [
   { name: "Daily", componentClass: Daily, defaultChecked: true },
@@ -44,6 +45,7 @@ function App() {
           <div className="tabs tabs-box bg-base-100">{elements}</div>
         </div>
       </div>
+      <Footer />
     </>
   );
 }
