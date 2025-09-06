@@ -1,21 +1,24 @@
+import { useDateInput, useFileInput } from "../hooks.ts";
+import InputDate from "./InputDate.tsx";
+import InputFile from "./InputFile.tsx";
 import PatternInput from "./PatternInput.tsx";
 
 function TextFilePattern() {
+  const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
+  const [file, onChange] = useFileInput();
+
   return (
     <PatternInput
       title="Text File Pattern"
-      subtitle="Upload a text file containing a pattern to draw on your commit graph.
-                Each line should represent a week, and each character a day. Use 0-4 to indicate commit counts"
+      subtitle={
+        <span>
+          Upload a text file containing a pattern to draw on your commit graph. <br />
+          The text file must have fewer than 7 rows. Use 0-4 to indicate commit counts
+        </span>
+      }
     >
-      <fieldset className="fieldset ">
-        <legend className="fieldset-legend">Start date</legend>
-        <input type="date" className="input w-full" />
-      </fieldset>
-
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">Pattern file</legend>
-        <input type="file" className="file-input w-full" />
-      </fieldset>
+      <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
+      <InputFile legend="Pattern file" accept="text/plain" onChange={onChange} />
     </PatternInput>
   );
 }

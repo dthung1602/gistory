@@ -1,5 +1,6 @@
-import { CommitCount } from "../constants.ts";
 import { useMemo } from "react";
+
+import { CommitCount } from "../constants.ts";
 import { isString } from "../utils.ts";
 
 type Prop = {
@@ -68,10 +69,7 @@ function Preview({ startDate, data }: Prop) {
     <div className="mb-4 flex flex-col items-start">
       <h2 className="font-bold text-lg mb-2">Preview</h2>
       <div className="pb-4 pt-2 pl-4 mb-2 overflow-x-scroll w-full">
-        <div
-          className="grid grid-rows-8 grid-flow-col gap-2"
-          aria-label="commit-graph"
-        >
+        <div className="grid grid-rows-8 grid-flow-col gap-2" aria-label="commit-graph">
           <div></div>
           <div></div>
           <div className="mr-2 font-bold">Mon</div>
@@ -112,11 +110,8 @@ function Preview({ startDate, data }: Prop) {
         </a>
         <div className="flex gap-1">
           Less &nbsp;
-          {COMMIT_COUNT_VALS.map((commit) => (
-            <div
-              key={"" + commit}
-              className={`w-5 h-5 inline-block rounded-sm border ${getColorForCommit(commit)}`}
-            />
+          {COMMIT_COUNT_VALS.map(commit => (
+            <div key={"" + commit} className={`w-5 h-5 inline-block rounded-sm border ${getColorForCommit(commit)}`} />
           ))}
           &nbsp; More
         </div>

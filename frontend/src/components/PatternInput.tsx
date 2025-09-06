@@ -1,10 +1,11 @@
 import * as React from "react";
-import Preview from "./Preview.tsx";
+
 import { CommitCount } from "../constants.ts";
+import Preview from "./Preview.tsx";
 
 type Prop = {
   title: string;
-  subtitle: string;
+  subtitle: React.ReactNode;
   children: React.ReactNode;
 };
 
@@ -16,13 +17,8 @@ function PatternInput({ title, subtitle, children }: Prop) {
       <div className="card-body">
         <h2 className="card-title">{title}</h2>
         <p>{subtitle}</p>
-
-        <div className="my-4 grid gap-4 grid-cols-1 md:grid-cols-2">
-          {children}
-        </div>
-
+        <div className="my-4 grid gap-x-4 gap-y-1 grid-cols-1 md:grid-cols-2">{children}</div>
         <Preview startDate={today} data={mockData} />
-
         <div className="card-actions justify-center">
           <button className="btn btn-secondary">Generate Repo</button>
         </div>

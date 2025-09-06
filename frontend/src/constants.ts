@@ -3,7 +3,13 @@ enum CommitCount {
   Few = "Few",
   Some = "Some",
   Many = "Many",
-  ALot = "Alot",
+  ALot = "ALot",
 }
 
-export { CommitCount };
+enum Font {
+  SubwayTracker = "SubwayTracker",
+}
+
+const SUNDAY = 0;
+
+export { CommitCount, Font, SUNDAY };

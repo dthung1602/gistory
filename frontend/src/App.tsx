@@ -1,19 +1,19 @@
 import Daily from "./components/Daily.tsx";
-import Random from "./components/Random.tsx";
-import Manual from "./components/Manual.tsx";
-import TextFilePattern from "./components/TextFilePattern.tsx";
-import Image from "./components/Image.tsx";
-import Text from "./components/Text.tsx";
-import Header from "./components/Header.tsx";
 import Footer from "./components/Footer.tsx";
+import Header from "./components/Header.tsx";
+import Image from "./components/Image.tsx";
+import Manual from "./components/Manual.tsx";
+import Random from "./components/Random.tsx";
+import Text from "./components/Text.tsx";
+import TextFilePattern from "./components/TextFilePattern.tsx";
 
 const tabs = [
   { name: "Daily", componentClass: Daily, defaultChecked: true },
   { name: "Random", componentClass: Random },
-  { name: "Manual Input", componentClass: Manual },
   { name: "Text File Pattern", componentClass: TextFilePattern },
   { name: "Image", componentClass: Image },
   { name: "Text", componentClass: Text },
+  { name: "Manual Input", componentClass: Manual },
 ];
 
 function App() {
