@@ -8,6 +8,8 @@ enum CommitCount {
   ALot = "ALot",
 }
 
+const ALL_COMMIT_COUNT = [...Object.values(CommitCount)];
+
 enum Font {
   SubwayTracker = "SubwayTracker",
 }
@@ -20,4 +22,4 @@ NEXT_6_MONTH.setMonth(TODAY.getMonth() + 6);
 const TODAY_STR = isoDate(TODAY);
 const NEXT_6_MONTH_STR = isoDate(NEXT_6_MONTH);
 
-export { CommitCount, Font, SUNDAY, TODAY_STR, NEXT_6_MONTH_STR };
+export { CommitCount, ALL_COMMIT_COUNT, Font, SUNDAY, TODAY_STR, NEXT_6_MONTH_STR };

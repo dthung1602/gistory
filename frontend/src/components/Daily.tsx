@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { TODAY_STR } from "../constants.ts";
+import { NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
 import { useCommitCountInput, useDateInput, usePreviewData } from "../hooks.ts";
 import { dayDiff } from "../utils.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
@@ -9,7 +9,7 @@ import PatternInput from "./PatternInput.tsx";
 
 function Daily() {
   const [startDate, onStartDateChange, startDateErr] = useDateInput({ defaultValue: TODAY_STR });
-  const [endDate, onEndDateChange, endDateErr] = useDateInput({ defaultValue: "2026-03-11", minDate: startDate });
+  const [endDate, onEndDateChange, endDateErr] = useDateInput({ defaultValue: NEXT_6_MONTH_STR, minDate: startDate });
   const [commitCount, onCommitCountChange] = useCommitCountInput();
   const [data, setData, setDataAtIndex] = usePreviewData();
 

@@ -99,7 +99,7 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
     }
 
     // Add empty cells at the end
-    addEmptyDataCells(newCells, 7 - date.getDay());
+    addEmptyDataCells(newCells, (7 - date.getDay()) % 7);
 
     return newCells;
   }, [startDate, data, setDataAtIndex]);
