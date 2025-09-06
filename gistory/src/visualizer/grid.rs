@@ -4,7 +4,7 @@ use chrono::{Datelike, NaiveDate, Weekday};
 use image::{GenericImageView, imageops};
 use log::{info, warn};
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -15,7 +15,7 @@ use crate::git::repo::Repo;
 use crate::utils::DateRangeIter;
 use crate::visualizer::font::{CHAR_HEIGHT, Char, Font, Pixel};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, clap::ValueEnum, Deserialize, Serialize)]
 pub enum CommitCount {
     Zero = 0,
     Few = 1,
@@ -43,6 +43,10 @@ pub struct CommitGrid {
 }
 
 impl CommitGrid {
+    pub fn get_data(&self) -> &[CommitCount] {
+        self.data.as_slice()
+    }
+
     pub async fn populate_repo(&self, repo: &mut Repo) -> Result<()> {
         info!("Populating repo at {:?}", repo.path);
         let date_range = DateRangeIter::new(self.start_date, self.data.len());
@@ -225,7 +229,7 @@ impl CommitGrid {
             if let Some(ch) = font.get_char(*byte) {
                 chars.push(ch);
             } else {
-                return Err(Error::Command(format!(
+                return Err(Error::InvalidData(format!(
                     "Text only accepts {}",
                     font.supported_chars()
                 )));

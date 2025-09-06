@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 axum = { version = "0.8.4", features = ["default", "multipart"] }
 axum-valid = "0.24.0"
-chrono = { version = "0.4.41", features = ["serde"] }
+chrono = { version = "0.4.0", features = ["serde", "rkyv"] }
 diesel = { version = "2.2.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
 dotenvy = "0.15"
 env_logger = "0.11.8"

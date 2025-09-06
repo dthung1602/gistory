@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Extension;
@@ -7,15 +8,50 @@ use axum_valid::Valid;
 use diesel::{
     ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection,
 };
+use gistory::visualizer;
 use log::info;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
-use crate::dto::{CreateRepoDto, UploadResult};
+use crate::dto::{CreateRepoDto, Preview, RepoVisualizeMethod, UploadResult, VisualizerMethodDto};
 use crate::error::{Error, FieldErr, Result};
 use crate::models::*;
 use crate::schema::repo;
+
+const UPLOAD_DIR: &str = "upload";
+
+pub async fn preview(Valid(Json(dto)): Valid<Json<VisualizerMethodDto>>) -> Result<Json<Preview>> {
+    info!("Preview dto: {dto:?}");
+    let mut grid = visualizer::CommitGrid::new(dto.start_date);
+
+    match dto.method {
+        RepoVisualizeMethod::Full => {
+            grid.full(dto.commit_count.unwrap(), dto.end_date.unwrap())?;
+        }
+        RepoVisualizeMethod::Random => grid.random(dto.end_date.unwrap())?,
+        RepoVisualizeMethod::PatternFile => {
+            let mut path_buf = PathBuf::from(UPLOAD_DIR);
+            path_buf.push(dto.input_file.unwrap());
+            grid.read_pattern_file(&path_buf).await?;
+        }
+        RepoVisualizeMethod::Image => {
+            let mut path_buf = PathBuf::from(UPLOAD_DIR);
+            path_buf.push(dto.input_file.unwrap());
+            grid.read_image_file(&path_buf).await?;
+        }
+        RepoVisualizeMethod::Text => {
+            let text = dto.text.unwrap();
+            let font = dto.font.unwrap();
+            let commit_count = dto.commit_count.unwrap();
+            grid.show_text(text.clone(), font, commit_count)?;
+        }
+    }
+
+    Ok(Json(Preview {
+        data: grid.get_data().to_vec(),
+    }))
+}
 
 pub async fn create_repo(
     Extension(conn): Extension<Arc<Mutex<SqliteConnection>>>,
@@ -30,7 +66,7 @@ pub async fn create_repo(
         username: create_repo_dto.username,
         email: create_repo_dto.email,
         branch: create_repo_dto.branch,
-        method: (create_repo_dto.method as usize) as i32,
+        method: create_repo_dto.visualizer_method.method as i32,
     };
     let res = diesel::insert_into(repo::table)
         .values(&new_repo)
@@ -58,8 +94,6 @@ pub async fn get_repo(
         Some(repo) => Ok(Json(repo)),
     }
 }
-
-const UPLOAD_DIR: &str = "upload";
 
 pub async fn upload_file(mut multipart: Multipart) -> Result<Json<UploadResult>> {
     info!("Processing file upload");

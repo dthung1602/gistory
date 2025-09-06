@@ -29,6 +29,7 @@ async fn main() {
             ServeFile::new_with_mime("static/index.html", &mime::TEXT_HTML),
         )
         .nest_service("/static", ServeDir::new("static"))
+        .route("/api/preview", get(handlers::preview))
         .route("/api/repo", post(handlers::create_repo))
         .route("/api/repo/{id}", get(handlers::get_repo))
         .route("/api/upload", post(handlers::upload_file))

@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{FixedOffset, NaiveDate};
 use gistory::visualizer::{CommitCount, Font};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,6 @@ pub enum RepoVisualizeMethod {
 }
 
 #[derive(Clone, Debug, Validate, Deserialize)]
-#[validate(schema(function = "validate_create_repo_dto", skip_on_field_errors = true))]
 pub struct CreateRepoDto {
     #[validate(regex(path = *NAME_REGEX))]
     pub name: String,
@@ -31,11 +30,31 @@ pub struct CreateRepoDto {
     pub email: String,
     #[validate(regex(path = *BRANCH_REGEX))]
     pub branch: String,
+    #[serde(deserialize_with = "deserialize_fixed_offset")]
+    pub timezone: FixedOffset,
+    #[validate(nested)]
+    pub visualizer_method: VisualizerMethodDto,
+}
 
+fn deserialize_fixed_offset<'de, D>(deserializer: D) -> Result<FixedOffset, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+
+    // Try parsing as offset string like "+0300", "-0500", etc.
+    s.parse::<FixedOffset>().map_err(serde::de::Error::custom)
+}
+
+#[derive(Clone, Debug, Validate, Deserialize)]
+#[validate(schema(
+    function = "validate_visualizer_method_dto",
+    skip_on_field_errors = true
+))]
+pub struct VisualizerMethodDto {
     pub method: RepoVisualizeMethod,
-
-    pub start_date: DateTime<FixedOffset>,
-    pub end_date: Option<DateTime<FixedOffset>>,
+    pub start_date: NaiveDate,
+    pub end_date: Option<NaiveDate>,
     pub commit_count: Option<CommitCount>,
     pub font: Option<Font>,
     #[validate(length(equal = 36))]
@@ -44,47 +63,52 @@ pub struct CreateRepoDto {
     pub text: Option<String>,
 }
 
-pub fn validate_create_repo_dto(create_repo_dto: &CreateRepoDto) -> Result<(), ValidationError> {
-    match create_repo_dto.method {
+pub fn validate_visualizer_method_dto(dto: &VisualizerMethodDto) -> Result<(), ValidationError> {
+    match dto.method {
         RepoVisualizeMethod::Full => {
-            if create_repo_dto.end_date.is_none() {
+            if dto.end_date.is_none() {
                 return Err(ValidationError::new("Full method requires end_date"));
             }
-            if create_repo_dto.commit_count.is_none() {
+            if dto.commit_count.is_none() {
                 return Err(ValidationError::new("Full method requires commit_count"));
             }
         }
         RepoVisualizeMethod::Random => {
-            if create_repo_dto.end_date.is_none() {
+            if dto.end_date.is_none() {
                 return Err(ValidationError::new("Random method requires end_date"));
             }
         }
         RepoVisualizeMethod::PatternFile => {
-            if create_repo_dto.input_file.is_none() {
+            if dto.input_file.is_none() {
                 return Err(ValidationError::new(
                     "PatternFile method requires input_file",
                 ));
             }
         }
         RepoVisualizeMethod::Image => {
-            if create_repo_dto.input_file.is_none() {
+            if dto.input_file.is_none() {
                 return Err(ValidationError::new("Image method requires input_file"));
             }
         }
         RepoVisualizeMethod::Text => {
-            if create_repo_dto.text.is_none() {
+            if dto.text.is_none() {
                 return Err(ValidationError::new("Full method requires text"));
             }
-            if create_repo_dto.font.is_none() {
+            if dto.font.is_none() {
                 return Err(ValidationError::new("Full method requires font"));
             }
-            if create_repo_dto.commit_count.is_none() {
+            if dto.commit_count.is_none() {
                 return Err(ValidationError::new("Full method requires commit_count"));
             }
         }
     }
 
     Ok(())
+}
+
+#[derive(Serialize, Debug)]
+pub struct Preview {
+    pub data: Vec<CommitCount>,
 }
 
 #[derive(Serialize, Debug)]

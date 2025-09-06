@@ -5,6 +5,7 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use diesel::result::Error as DieselError;
+use gistory::error::Error as GistoryError;
 use serde_json::json;
 
 pub type Result<T> = StdResult<T, Error>;
@@ -20,6 +21,7 @@ pub enum Error {
     NotFound,
     InvalidInput(Vec<FieldErr>),
     Database(DieselError),
+    GistoryError(GistoryError),
     IO(IOError),
 }
 
@@ -68,5 +70,27 @@ impl From<DieselError> for Error {
 impl From<IOError> for Error {
     fn from(value: IOError) -> Self {
         Error::IO(value)
+    }
+}
+
+impl From<GistoryError> for Error {
+    fn from(value: GistoryError) -> Self {
+        use GistoryError::*;
+        match value {
+            Io(e) => Error::IO(e),
+            InvalidArg(message) => Error::InvalidInput(vec![FieldErr {
+                field: "__all__".to_string(),
+                message,
+            }]),
+            Utf8(e) => Error::InvalidInput(vec![FieldErr {
+                field: "__all__".to_string(),
+                message: format!("{e}"),
+            }]),
+            InvalidData(message) => Error::InvalidInput(vec![FieldErr {
+                field: "__all__".to_string(),
+                message,
+            }]),
+            _ => Error::GistoryError(value),
+        }
     }
 }
