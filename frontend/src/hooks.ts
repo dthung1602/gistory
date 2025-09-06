@@ -1,7 +1,7 @@
-import { type ChangeEvent, type Ref, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import { CommitCount, Font, SUNDAY } from "./constants.ts";
-import type { OnInputChange, OnSelectChange } from "./types.ts";
+import type { OnInputChange, OnSelectChange, SetDataAtIndexFunc } from "./types.ts";
 import { debounce } from "./utils.ts";
 
 type UseDateInputArg = {
@@ -10,7 +10,7 @@ type UseDateInputArg = {
 };
 
 function useDateInput({ minDate = "0", mustBeSunday = false }: UseDateInputArg = {}): [string, OnInputChange, string] {
-  const [date, setDate] = useState<string>("");
+  const [date, setDate] = useState<string>(new Date().toDateString());
   const [error, setError] = useState<string>("");
 
   const onChange = useCallback(
@@ -91,4 +91,53 @@ function useTextInput(debounceTime: number = 0): [string, OnInputChange, RefObje
   return [text, onChange, ref];
 }
 
-export { useDateInput, useCommitCountInput, useFontInput, useFileInput, useTextInput };
+function usePreviewData(): [CommitCount[], SetDataAtIndexFunc] {
+  const [data, setData] = useState<CommitCount[]>(mockData);
+
+  const setDataAtIndex = useCallback(
+    (c: CommitCount, idx: number) => {
+      const newData = [...data];
+      newData[idx] = c;
+      setData(newData);
+    },
+    [data],
+  );
+
+  return [data, setDataAtIndex];
+}
+
+let mockData = [
+  CommitCount.ALot,
+  CommitCount.ALot,
+  CommitCount.Many,
+  CommitCount.Many,
+  CommitCount.Zero,
+  CommitCount.Few,
+  CommitCount.Some,
+  //
+  CommitCount.Some,
+  CommitCount.Zero,
+  CommitCount.ALot,
+  CommitCount.Few,
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.ALot,
+  //
+  CommitCount.Some,
+  CommitCount.ALot,
+  CommitCount.Many,
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.Few,
+  CommitCount.Many,
+  //
+  CommitCount.Zero,
+  CommitCount.Some,
+  CommitCount.ALot,
+  CommitCount.Many,
+];
+
+mockData = [...mockData, ...mockData, ...mockData, ...mockData, ...mockData];
+mockData = [...mockData, ...mockData];
+
+export { useDateInput, useCommitCountInput, useFontInput, useFileInput, useTextInput, usePreviewData };

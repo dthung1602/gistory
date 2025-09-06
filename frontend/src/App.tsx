@@ -9,11 +9,11 @@ import TextFilePattern from "./components/TextFilePattern.tsx";
 
 const tabs = [
   { name: "Daily", componentClass: Daily, defaultChecked: true },
-  { name: "Random", componentClass: Random },
-  { name: "Text File Pattern", componentClass: TextFilePattern },
-  { name: "Image", componentClass: Image },
-  { name: "Text", componentClass: Text },
-  { name: "Manual Input", componentClass: Manual },
+  // { name: "Random", componentClass: Random },
+  // { name: "Text File Pattern", componentClass: TextFilePattern },
+  // { name: "Image", componentClass: Image },
+  // { name: "Text", componentClass: Text },
+  // { name: "Manual Input", componentClass: Manual },
 ];
 
 function App() {

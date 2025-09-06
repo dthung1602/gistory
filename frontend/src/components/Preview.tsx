@@ -1,14 +1,21 @@
 import { useMemo } from "react";
+import * as React from "react";
 
 import { CommitCount } from "../constants.ts";
-import { isString } from "../utils.ts";
+import { isString, nextCommitCount } from "../utils.ts";
 
 type Prop = {
-  startDate: Date;
+  startDate: string;
   data: CommitCount[];
+  setDataAtIndex: (commitCount: CommitCount, idx: number) => void;
 };
 
-type Cell = string | { cellLabel: string; commitCount: CommitCount };
+type DataCell = {
+  cellLabel: string;
+  commitCount: CommitCount;
+  onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+};
+type Cell = string | DataCell;
 
 const COMMIT_COUNT_VALS = [null, ...Object.values(CommitCount)];
 
@@ -29,7 +36,7 @@ function getColorForCommit(count: CommitCount | null): string {
   }
 }
 
-function Preview({ startDate, data }: Prop) {
+function Preview({ startDate, data, setDataAtIndex }: Prop) {
   // Ensure we have at least 7 days per week representation
   const cells = useMemo(() => {
     const totalDataCells = Math.ceil(data.length / 7) * 7;
@@ -42,7 +49,7 @@ function Preview({ startDate, data }: Prop) {
       day: "numeric",
     });
     const monthFormater = new Intl.DateTimeFormat("en-US", { month: "short" });
-    const date = startDate;
+    const date = new Date(startDate);
 
     for (let i = 0; i < totalDataCells; i++) {
       const currentMonth = date.getMonth();
@@ -57,13 +64,16 @@ function Preview({ startDate, data }: Prop) {
 
       const commitCount: CommitCount | null = data[i] || null;
       const cellLabel: string = `${commitCount || "No"} commits on ${dateFormater.format(date)}`;
-      cells.push({ cellLabel, commitCount });
+      const onClick = () => {
+        setDataAtIndex(nextCommitCount(data[i]), i);
+      };
+      cells.push({ cellLabel, commitCount, onClick });
 
       date.setDate(date.getDate() + 1);
     }
 
     return cells;
-  }, [data, startDate]);
+  }, [startDate, data, setDataAtIndex]);
 
   return (
     <div className="mb-4 flex flex-col items-start">
@@ -93,6 +103,7 @@ function Preview({ startDate, data }: Prop) {
             return (
               <div
                 key={idx}
+                onClick={cell.onClick}
                 className={`w-5 h-5 rounded-sm tooltip tooltip-info foo hover:scale-110 hover:z-10
                       cursor-pointer transition-colors duration-250 ${colorClass} ${borderClass}`}
                 data-tip={cell.cellLabel}
