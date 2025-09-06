@@ -1,4 +1,13 @@
-import { type ChangeEvent, type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { CommitCount, Font, SUNDAY, TODAY_STR } from "./constants.ts";
 import type { OnInputChange, OnSelectChange, SetDataAtIndexFunc } from "./types.ts";
@@ -61,7 +70,7 @@ function useEnumInput<E extends string>(enumObj: Record<string, E>, defaultValue
 }
 
 function useCommitCountInput(): [CommitCount, OnSelectChange] {
-  return useEnumInput<CommitCount>(CommitCount, CommitCount.Zero);
+  return useEnumInput<CommitCount>(CommitCount, CommitCount.Some);
 }
 
 function useFontInput(): [Font, OnSelectChange] {
@@ -96,7 +105,7 @@ function useTextInput(debounceTime: number = 0): [string, OnInputChange, RefObje
   return [text, onChange, ref];
 }
 
-function usePreviewData(): [CommitCount[], SetDataAtIndexFunc] {
+function usePreviewData(): [CommitCount[], Dispatch<SetStateAction<CommitCount[]>>, SetDataAtIndexFunc] {
   const [data, setData] = useState<CommitCount[]>(mockData);
 
   const setDataAtIndex = useCallback(
@@ -108,7 +117,7 @@ function usePreviewData(): [CommitCount[], SetDataAtIndexFunc] {
     [data],
   );
 
-  return [data, setDataAtIndex];
+  return [data, setData, setDataAtIndex];
 }
 
 let mockData = [

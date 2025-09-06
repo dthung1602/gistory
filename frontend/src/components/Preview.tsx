@@ -1,21 +1,26 @@
 import { useMemo } from "react";
 import * as React from "react";
 
-import { CommitCount, SUNDAY } from "../constants.ts";
-import { isString, nextCommitCount } from "../utils.ts";
+import { CommitCount } from "../constants.ts";
+import { dateFormater, monthFormater, nextCommitCount } from "../utils.ts";
 
 type Prop = {
-  startDate: string;
-  data: CommitCount[];
-  setDataAtIndex: (commitCount: CommitCount, idx: number) => void;
+  readonly startDate: string;
+  readonly data: CommitCount[];
+  readonly setDataAtIndex: (commitCount: CommitCount, idx: number) => void;
 };
 
 type DataCell = {
+  key: string;
   cellLabel: string;
   commitCount: CommitCount | null;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
-type Cell = string | DataCell;
+type LabelCell = {
+  key: string;
+  text: string;
+};
+type Cell = LabelCell | DataCell;
 
 const COMMIT_COUNT_VALS = [null, ...Object.values(CommitCount)];
 
@@ -36,54 +41,67 @@ function getColorForCommit(count: CommitCount | null): string {
   }
 }
 
-const emptyCell: DataCell = {
-  cellLabel: "No commit",
-  commitCount: null,
-  onClick: () => {},
-};
+function addEmptyDataCells(cells: Cell[], n: number) {
+  for (let i = 0; i < n; i++) {
+    cells.push({
+      cellLabel: "No commit",
+      commitCount: null,
+      onClick: () => {},
+      key: "" + Math.random(),
+    });
+  }
+}
 
 function Preview({ startDate, data, setDataAtIndex }: Prop) {
-  // Ensure we have at least 7 days per week representation
   const cells = useMemo(() => {
     const date = new Date(startDate);
+    const newCells: Cell[] = [];
 
-    let cells: Cell[] = [];
-    if (date.getDate() != SUNDAY) {
-      cells = ["", ...Array(date.getDate()).fill(emptyCell)];
-    }
-    const initEmptyCellCount = cells.length;
+    // Ensure we have at least 7 days per week representation
+    // Add empty cells at the beginning
+    newCells.push({ text: "", key: "" + Math.random() });
+    addEmptyDataCells(newCells, date.getDay());
+
+    const initEmptyCellCount = newCells.length;
 
     let lastMonth = -1;
-    const dateFormater = new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-    const monthFormater = new Intl.DateTimeFormat("en-US", { month: "short" });
-
     for (let i = 0; i < data.length; i++) {
-      const currentMonth = date.getMonth();
+      // Beginning of new column.
+      // Add month label if this column belongs to a different month
       if ((i + initEmptyCellCount) % 7 == 1) {
+        const currentMonth = date.getMonth();
+        let text = "";
+        // The labels shouldn't be too close together,
+        // hence we do not add a label if date in month > 16
         if (currentMonth != lastMonth && date.getDate() < 16) {
-          cells.push(monthFormater.format(date));
+          text = monthFormater.format(date);
           lastMonth = currentMonth;
-        } else {
-          cells.push("");
         }
+        // remove redundant padding if start date is a sunday
+        if (i == 0) {
+          newCells.pop();
+        }
+        newCells.push({
+          text,
+          key: "label-" + date.toISOString(),
+        });
       }
 
-      const commitCount: CommitCount = data[i];
+      const commitCount = data[i];
       const cellLabel: string = `${commitCount} commits on ${dateFormater.format(date)}`;
       const onClick = () => {
         setDataAtIndex(nextCommitCount(data[i]), i);
       };
-      cells.push({ cellLabel, commitCount, onClick });
+      const key = "data-" + date.toISOString();
+      newCells.push({ cellLabel, commitCount, onClick, key });
 
       date.setDate(date.getDate() + 1);
     }
 
-    cells = cells.concat(Array(7 - date.getDay()).fill(emptyCell));
+    // Add empty cells at the end
+    addEmptyDataCells(newCells, 7 - date.getDay());
 
-    return cells;
+    return newCells;
   }, [startDate, data, setDataAtIndex]);
 
   return (
@@ -91,19 +109,25 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
       <h2 className="font-bold text-lg mb-2">Preview</h2>
       <div className="pb-4 pt-3 pl-8 mb-2 overflow-x-scroll w-full">
         <div className="grid grid-rows-8 grid-flow-col gap-1.5" aria-label="commit-graph">
-          <div></div>
-          <div></div>
-          <div className="mr-2 font-bold">Mon</div>
-          <div></div>
-          <div className="mr-2 font-bold">Wed</div>
-          <div></div>
-          <div className="mr-2 font-bold">Fri</div>
-          <div></div>
-          {cells.map((cell, idx) => {
-            if (isString(cell)) {
+          <div key="First" />
+          <div key="Sun" />
+          <div key="Mon" className="mr-2 font-bold">
+            Mon
+          </div>
+          <div key="Tue" />
+          <div key="Wed" className="mr-2 font-bold">
+            Wed
+          </div>
+          <div key="Thu" />
+          <div key="Fri" className="mr-2 font-bold">
+            Fri
+          </div>
+          <div key="Sat" />
+          {cells.map(cell => {
+            if ("text" in cell) {
               return (
-                <div key={idx} className="w-5 h-5 font-bold whitespace-nowrap">
-                  {cell}
+                <div key={cell.key} className="w-5 h-5 font-bold whitespace-nowrap">
+                  {cell.text}
                 </div>
               );
             }
@@ -113,7 +137,7 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
             const borderClass = isFilled ? "border border-black/0" : "border";
             return (
               <div
-                key={idx}
+                key={cell.key}
                 onClick={cell.onClick}
                 className={`w-5 h-5 rounded-xs tooltip tooltip-info foo hover:scale-110 hover:z-10
                       cursor-pointer transition-colors duration-250 ${colorClass} ${borderClass}`}
