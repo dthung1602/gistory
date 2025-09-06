@@ -1,16 +1,21 @@
 import { type ChangeEvent, type RefObject, useCallback, useEffect, useRef, useState } from "react";
 
-import { CommitCount, Font, SUNDAY } from "./constants.ts";
+import { CommitCount, Font, SUNDAY, TODAY_STR } from "./constants.ts";
 import type { OnInputChange, OnSelectChange, SetDataAtIndexFunc } from "./types.ts";
 import { debounce } from "./utils.ts";
 
 type UseDateInputArg = {
   minDate?: string;
   mustBeSunday?: boolean;
+  defaultValue?: string;
 };
 
-function useDateInput({ minDate = "0", mustBeSunday = false }: UseDateInputArg = {}): [string, OnInputChange, string] {
-  const [date, setDate] = useState<string>(new Date().toDateString());
+function useDateInput({ minDate = "0", mustBeSunday = false, defaultValue = TODAY_STR }: UseDateInputArg = {}): [
+  string,
+  OnInputChange,
+  string,
+] {
+  const [date, setDate] = useState<string>(defaultValue);
   const [error, setError] = useState<string>("");
 
   const onChange = useCallback(

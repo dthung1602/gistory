@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import * as React from "react";
 
-import { CommitCount } from "../constants.ts";
+import { CommitCount, SUNDAY } from "../constants.ts";
 import { isString, nextCommitCount } from "../utils.ts";
 
 type Prop = {
@@ -12,7 +12,7 @@ type Prop = {
 
 type DataCell = {
   cellLabel: string;
-  commitCount: CommitCount;
+  commitCount: CommitCount | null;
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
 };
 type Cell = string | DataCell;
@@ -36,12 +36,22 @@ function getColorForCommit(count: CommitCount | null): string {
   }
 }
 
+const emptyCell: DataCell = {
+  cellLabel: "No commit",
+  commitCount: null,
+  onClick: () => {},
+};
+
 function Preview({ startDate, data, setDataAtIndex }: Prop) {
   // Ensure we have at least 7 days per week representation
   const cells = useMemo(() => {
-    const totalDataCells = Math.ceil(data.length / 7) * 7;
+    const date = new Date(startDate);
 
-    const cells: Cell[] = [];
+    let cells: Cell[] = [];
+    if (date.getDate() != SUNDAY) {
+      cells = ["", ...Array(date.getDate()).fill(emptyCell)];
+    }
+    const initEmptyCellCount = cells.length;
 
     let lastMonth = -1;
     const dateFormater = new Intl.DateTimeFormat("en-US", {
@@ -49,11 +59,10 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
       day: "numeric",
     });
     const monthFormater = new Intl.DateTimeFormat("en-US", { month: "short" });
-    const date = new Date(startDate);
 
-    for (let i = 0; i < totalDataCells; i++) {
+    for (let i = 0; i < data.length; i++) {
       const currentMonth = date.getMonth();
-      if (i % 7 == 0) {
+      if ((i + initEmptyCellCount) % 7 == 1) {
         if (currentMonth != lastMonth && date.getDate() < 16) {
           cells.push(monthFormater.format(date));
           lastMonth = currentMonth;
@@ -62,8 +71,8 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
         }
       }
 
-      const commitCount: CommitCount | null = data[i] || null;
-      const cellLabel: string = `${commitCount || "No"} commits on ${dateFormater.format(date)}`;
+      const commitCount: CommitCount = data[i];
+      const cellLabel: string = `${commitCount} commits on ${dateFormater.format(date)}`;
       const onClick = () => {
         setDataAtIndex(nextCommitCount(data[i]), i);
       };
@@ -72,14 +81,16 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
       date.setDate(date.getDate() + 1);
     }
 
+    cells = cells.concat(Array(7 - date.getDay()).fill(emptyCell));
+
     return cells;
   }, [startDate, data, setDataAtIndex]);
 
   return (
     <div className="mb-4 flex flex-col items-start">
       <h2 className="font-bold text-lg mb-2">Preview</h2>
-      <div className="pb-4 pt-2 pl-4 mb-2 overflow-x-scroll w-full">
-        <div className="grid grid-rows-8 grid-flow-col gap-2" aria-label="commit-graph">
+      <div className="pb-4 pt-3 pl-8 mb-2 overflow-x-scroll w-full">
+        <div className="grid grid-rows-8 grid-flow-col gap-1.5" aria-label="commit-graph">
           <div></div>
           <div></div>
           <div className="mr-2 font-bold">Mon</div>
@@ -104,7 +115,7 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
               <div
                 key={idx}
                 onClick={cell.onClick}
-                className={`w-5 h-5 rounded-sm tooltip tooltip-info foo hover:scale-110 hover:z-10
+                className={`w-5 h-5 rounded-xs tooltip tooltip-info foo hover:scale-110 hover:z-10
                       cursor-pointer transition-colors duration-250 ${colorClass} ${borderClass}`}
                 data-tip={cell.cellLabel}
               />

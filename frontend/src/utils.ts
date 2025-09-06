@@ -14,16 +14,21 @@ function debounce(callback: (...args: unknown[]) => unknown, wait: number) {
   };
 }
 
-const NEXT_COMMIT_COUNT = {
-  [CommitCount.Zero]: CommitCount.Few,
-  [CommitCount.Few]: CommitCount.Some,
-  [CommitCount.Some]: CommitCount.Many,
-  [CommitCount.Many]: CommitCount.ALot,
-  [CommitCount.ALot]: CommitCount.Zero,
-};
+const NEXT_COMMIT_COUNT = new Map([
+  [null, CommitCount.Zero],
+  [CommitCount.Zero, CommitCount.Few],
+  [CommitCount.Few, CommitCount.Some],
+  [CommitCount.Some, CommitCount.Many],
+  [CommitCount.Many, CommitCount.ALot],
+  [CommitCount.ALot, CommitCount.Zero],
+]);
 
-function nextCommitCount(c: CommitCount): CommitCount {
-  return NEXT_COMMIT_COUNT[c];
+function nextCommitCount(c: CommitCount | null): CommitCount {
+  return NEXT_COMMIT_COUNT.get(c) as CommitCount;
 }
 
-export { isString, debounce, nextCommitCount };
+function isoDate(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
+export { isString, debounce, nextCommitCount, isoDate };

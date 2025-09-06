@@ -1,11 +1,12 @@
+import { NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
 import { useCommitCountInput, useDateInput, usePreviewData } from "../hooks.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
 import InputDate from "./InputDate.tsx";
 import PatternInput from "./PatternInput.tsx";
 
 function Daily() {
-  const [startDate, onStartDateChange, startDateErr] = useDateInput();
-  const [endDate, onEndDateChange, endDateErr] = useDateInput({ minDate: startDate });
+  const [startDate, onStartDateChange, startDateErr] = useDateInput({ defaultValue: TODAY_STR });
+  const [endDate, onEndDateChange, endDateErr] = useDateInput({ defaultValue: NEXT_6_MONTH_STR, minDate: startDate });
   const [commitCount, onCommitCountChange] = useCommitCountInput();
   const [data, setDataAtIndex] = usePreviewData();
 
