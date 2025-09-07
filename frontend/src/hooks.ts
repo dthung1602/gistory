@@ -132,38 +132,6 @@ function usePreviewData(): [CommitCount[], Dispatch<SetStateAction<CommitCount[]
   return [data, setData, setDataAtIndex];
 }
 
-let mockData = [
-  CommitCount.ALot,
-  CommitCount.ALot,
-  CommitCount.Many,
-  CommitCount.Many,
-  CommitCount.Zero,
-  CommitCount.Few,
-  CommitCount.Some,
-  //
-  CommitCount.Some,
-  CommitCount.Zero,
-  CommitCount.ALot,
-  CommitCount.Few,
-  CommitCount.Zero,
-  CommitCount.Some,
-  CommitCount.ALot,
-  //
-  CommitCount.Some,
-  CommitCount.ALot,
-  CommitCount.Many,
-  CommitCount.Zero,
-  CommitCount.Some,
-  CommitCount.Few,
-  CommitCount.Many,
-  //
-  CommitCount.Zero,
-  CommitCount.Some,
-  CommitCount.ALot,
-  CommitCount.Many,
-];
-
-mockData = [...mockData, ...mockData, ...mockData, ...mockData, ...mockData];
-mockData = [...mockData, ...mockData];
+const mockData = Array(180).fill(CommitCount.Some);
 
 export { useDateInput, useCommitCountInput, useFontInput, useFileInput, useTextInput, usePreviewData };

@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
+import { ToastContext } from "../context.ts";
 import { useDateInput, useFileInput, usePreviewData } from "../hooks.ts";
 import type { FileUploadResult, PreviewResult } from "../types.ts";
 import InputDate from "./InputDate.tsx";
 import InputFile from "./InputFile.tsx";
-import PatternInput from "./PatternInput.tsx";
+import PatternTab from "./PatternTab.tsx";
 
 function TextFilePattern() {
+  const { addToast } = useContext(ToastContext);
+
   const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
   const { file, onChange, fileId, setFileId, fileErr, setFileErr } = useFileInput();
 
@@ -33,7 +36,7 @@ function TextFilePattern() {
         const { uuid } = (await res.json()) as FileUploadResult;
         setFileId(uuid);
       })
-      .catch((e: Error) => setFileErr("Error: " + e))
+      .catch(api.errHandler(addToast, setFileErr))
       .finally(() => setLoading(false));
 
     return () => {
@@ -67,7 +70,7 @@ function TextFilePattern() {
   }, [fileId, startDate]);
 
   return (
-    <PatternInput
+    <PatternTab
       title="Text File Pattern"
       subtitle={
         <span>
@@ -81,7 +84,7 @@ function TextFilePattern() {
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputFile legend="Pattern file" accept="text/plain" onChange={onChange} error={fileErr} />
-    </PatternInput>
+    </PatternTab>
   );
 }
 

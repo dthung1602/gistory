@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import * as React from "react";
+import { useMemo } from "react";
 
 import { CommitCount } from "../constants.ts";
 import { dateFormater, monthFormater, nextCommitCount } from "../utils.ts";

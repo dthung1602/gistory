@@ -5,7 +5,7 @@ import { useCommitCountInput, useDateInput, usePreviewData } from "../hooks.ts";
 import { dayDiff } from "../utils.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
 import InputDate from "./InputDate.tsx";
-import PatternInput from "./PatternInput.tsx";
+import PatternTab from "./PatternTab.tsx";
 
 function Daily() {
   const [startDate, onStartDateChange, startDateErr] = useDateInput({ defaultValue: TODAY_STR });
@@ -28,7 +28,7 @@ function Daily() {
   }, [startDate, endDate, commitCount]);
 
   return (
-    <PatternInput
+    <PatternTab
       title="Daily Commits Pattern"
       subtitle="Generate a pattern with a fixed number of commits every day within a date range"
       startDate={startDate}
@@ -40,7 +40,7 @@ function Daily() {
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputDate legend="End date" date={endDate} onDateChange={onEndDateChange} dateErr={endDateErr} />
       <InputCommitCount value={commitCount} onChange={onCommitCountChange} />
-    </PatternInput>
+    </PatternTab>
   );
 }
 

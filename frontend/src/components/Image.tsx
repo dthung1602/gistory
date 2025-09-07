@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
+import { ToastContext } from "../context.ts";
 import { useDateInput, useFileInput, usePreviewData } from "../hooks.ts";
 import type { FileUploadResult, PreviewResult } from "../types.ts";
 import InputDate from "./InputDate.tsx";
 import InputFile from "./InputFile.tsx";
-import PatternInput from "./PatternInput.tsx";
+import PatternTab from "./PatternTab.tsx";
 
 function Image() {
+  const { addToast } = useContext(ToastContext);
+
   const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
   const { file, onChange, fileId, setFileId, fileErr, setFileErr } = useFileInput();
 
@@ -33,7 +36,7 @@ function Image() {
         const { uuid } = (await res.json()) as FileUploadResult;
         setFileId(uuid);
       })
-      .catch((e: Error) => setFileErr("Error: " + e))
+      .catch(api.errHandler(addToast, setFileErr))
       .finally(() => setLoading(false));
 
     return () => {
@@ -57,7 +60,7 @@ function Image() {
         const { data } = (await res.json()) as PreviewResult;
         setData(data);
       })
-      .catch((e: Error) => setFileErr("Error: " + e))
+      .catch(api.errHandler(addToast, setFileErr))
       .finally(() => setLoading(false));
 
     return () => {
@@ -67,7 +70,7 @@ function Image() {
   }, [fileId, startDate]);
 
   return (
-    <PatternInput
+    <PatternTab
       title="Image Pattern"
       subtitle="Upload an image to convert into a commit pattern. The image will be simplified and mapped to commit counts."
       startDate={startDate}
@@ -76,7 +79,7 @@ function Image() {
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputFile legend="Image" accept="image/*" onChange={onChange} />
-    </PatternInput>
+    </PatternTab>
   );
 }
 

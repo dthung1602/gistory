@@ -4,7 +4,7 @@ import { ALL_COMMIT_COUNT, NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
 import { useDateInput, usePreviewData } from "../hooks.ts";
 import { dayDiff } from "../utils.ts";
 import InputDate from "./InputDate.tsx";
-import PatternInput from "./PatternInput.tsx";
+import PatternTab from "./PatternTab.tsx";
 
 function Random() {
   const [startDate, onStartDateChange, startDateErr] = useDateInput({ defaultValue: TODAY_STR });
@@ -30,7 +30,7 @@ function Random() {
   }, [startDate, endDate]);
 
   return (
-    <PatternInput
+    <PatternTab
       title="Random Commits Pattern"
       subtitle="Generate a pattern with a random number of commits each day within a date range"
       startDate={startDate}
@@ -41,7 +41,7 @@ function Random() {
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputDate legend="End date" date={endDate} onDateChange={onEndDateChange} dateErr={endDateErr} />
-    </PatternInput>
+    </PatternTab>
   );
 }
 

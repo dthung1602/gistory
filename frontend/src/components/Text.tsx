@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
+import { ToastContext } from "../context.ts";
 import { useCommitCountInput, useDateInput, useFontInput, usePreviewData, useTextInput } from "../hooks.ts";
 import type { PreviewResult } from "../types.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
 import InputDate from "./InputDate.tsx";
 import InputFont from "./InputFont.tsx";
 import InputText from "./InputText.tsx";
-import PatternInput from "./PatternInput.tsx";
+import PatternTab from "./PatternTab.tsx";
 
 function Text() {
+  const { addToast } = useContext(ToastContext);
+
   const [startDate, onStartDateChange, startDateErr] = useDateInput();
   const [commitCount, onCommitCountChange] = useCommitCountInput();
   const [font, onFontChange] = useFontInput();
@@ -45,7 +48,7 @@ function Text() {
         const { data } = (await res.json()) as PreviewResult;
         setData(data);
       })
-      .catch(() => {})
+      .catch(api.errHandler(addToast))
       .finally(() => setLoading(false));
 
     return () => {
@@ -55,7 +58,7 @@ function Text() {
   }, [startDate, commitCount, font, text, setData]);
 
   return (
-    <PatternInput
+    <PatternTab
       title="Text Pattern"
       subtitle="Display text on your commit graph. The text will be converted into a commit pattern"
       startDate={startDate}
@@ -72,7 +75,7 @@ function Text() {
         onChange={onTextChange}
         inputRef={textInputRef}
       />
-    </PatternInput>
+    </PatternTab>
   );
 }
 

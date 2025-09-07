@@ -1,4 +1,7 @@
+import type { Dispatch } from "react";
+
 import { type CommitCount, Font, VisualizerMethod } from "./constants.ts";
+import type { AddToast } from "./context.ts";
 
 const BACKEND_ENDPOINT = import.meta.env.BACKEND_ENDPOINT || "http://localhost:5173/api/";
 
@@ -26,7 +29,7 @@ function upload(file: File): ReqControl {
     method: "POST",
     body: formData,
     signal: controller.signal,
-  });
+  }).then(checkStatus);
 
   return [promise, controller];
 }
@@ -40,7 +43,35 @@ function get(path: string, req: Record<string, unknown>): ReqControl {
     params.append(k, "" + v);
   }
   const url = BACKEND_ENDPOINT + path + "?" + params;
-  return [fetch(url, { signal: controller.signal }), controller];
+  const fetchPromise = fetch(url, { signal: controller.signal }).then(checkStatus);
+  return [fetchPromise, controller];
 }
 
-export default { preview, upload };
+function checkStatus(res: Response) {
+  if (!res.ok) {
+    console.error(`Response with status ${res.status} ${res.statusText}`);
+    throw Error(res.statusText);
+  }
+  return res;
+}
+
+function errHandler(addToast: AddToast, setErr: Dispatch<string> = () => {}) {
+  return (err: Error) => {
+    if (err.name == "AbortError") {
+      return;
+    }
+    const errStr = err + "";
+    setErr(errStr);
+    addToast({
+      key: Math.random(),
+      type: "error",
+      content: (
+        <span>
+          <b>Error:</b> {errStr}
+        </span>
+      ),
+    });
+  };
+}
+
+export default { preview, upload, errHandler, checkStatus };

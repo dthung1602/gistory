@@ -15,7 +15,7 @@ type Prop = {
   onGenerate?: OnButtonClick;
 };
 
-function PatternInput({ title, subtitle, children, startDate, data, setDataAtIndex, isGenerating, onGenerate }: Prop) {
+function PatternTab({ title, subtitle, children, startDate, data, setDataAtIndex, isGenerating, onGenerate }: Prop) {
   const disableGenerateCls = isGenerating || !onGenerate ? "btn-disabled" : "";
   return (
     <div className="card bg-neutral text-neutral-content shadow-sm">
@@ -35,4 +35,4 @@ function PatternInput({ title, subtitle, children, startDate, data, setDataAtInd
   );
 }
 
-export default PatternInput;
+export default PatternTab;
