@@ -16,6 +16,21 @@ function preview(req: PreviewReq): ReqControl {
   return get("preview", req);
 }
 
+function upload(file: File): ReqControl {
+  const controller = new AbortController();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const url = BACKEND_ENDPOINT + "upload";
+  const promise = fetch(url, {
+    method: "POST",
+    body: formData,
+    signal: controller.signal,
+  });
+
+  return [promise, controller];
+}
+
 type ReqControl = [Promise<Response>, AbortController];
 
 function get(path: string, req: Record<string, unknown>): ReqControl {
@@ -28,4 +43,4 @@ function get(path: string, req: Record<string, unknown>): ReqControl {
   return [fetch(url, { signal: controller.signal }), controller];
 }
 
-export default { preview };
+export default { preview, upload };

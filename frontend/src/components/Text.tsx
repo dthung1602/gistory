@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 import api from "../api.tsx";
-import { CommitCount, VisualizerMethod } from "../constants.ts";
+import { VisualizerMethod } from "../constants.ts";
 import { useCommitCountInput, useDateInput, useFontInput, usePreviewData, useTextInput } from "../hooks.ts";
+import type { PreviewResult } from "../types.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
 import InputDate from "./InputDate.tsx";
 import InputFont from "./InputFont.tsx";
@@ -41,7 +42,7 @@ function Text() {
     resPromise
       .then(async res => {
         if (controller.signal.aborted) return;
-        const { data } = (await res.json()) as { data: CommitCount[] };
+        const { data } = (await res.json()) as PreviewResult;
         setData(data);
       })
       .catch(() => {})

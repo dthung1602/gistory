@@ -77,8 +77,20 @@ function useFontInput(): [Font, OnSelectChange] {
   return useEnumInput<Font>(Font, Font.SubwayTracker);
 }
 
-function useFileInput(): [File | null, OnInputChange] {
+type UseFileInput = {
+  file: File | null;
+  onChange: OnInputChange;
+  fileId: string;
+  setFileId: Dispatch<string>;
+  fileErr: string;
+  setFileErr: Dispatch<string>;
+};
+
+function useFileInput(): UseFileInput {
   const [file, setFile] = useState<File | null>(null);
+  const [fileId, setFileId] = useState("");
+  const [fileErr, setFileErr] = useState("");
+
   const onChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       if (event.target.files != null) {
@@ -87,7 +99,7 @@ function useFileInput(): [File | null, OnInputChange] {
     },
     [setFile],
   );
-  return [file, onChange];
+  return { file, onChange, fileId, setFileId, fileErr, setFileErr };
 }
 
 function useTextInput(debounceTime: number = 0): [string, OnInputChange, RefObject<HTMLInputElement | null>] {

@@ -1,5 +1,4 @@
 import { type ChangeEvent, type MouseEvent } from "react";
-import * as React from "react";
 
 import type { CommitCount } from "./constants.ts";
 
@@ -13,4 +12,22 @@ type SelectInputProp<V = string> = {
 };
 type SetDataAtIndexFunc = (c: CommitCount, i: number) => void;
 
-export type { OnInputChange, OnSelectChange, SelectInputProp, SetDataAtIndexFunc, OnButtonClick };
+type FileUploadResult = {
+  uuid: string;
+  content_type: string;
+  size: number;
+};
+
+type PreviewResult = {
+  data: CommitCount[];
+};
+
+export type {
+  OnInputChange,
+  OnSelectChange,
+  SelectInputProp,
+  SetDataAtIndexFunc,
+  OnButtonClick,
+  FileUploadResult,
+  PreviewResult,
+};
