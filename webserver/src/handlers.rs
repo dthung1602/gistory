@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use axum::Extension;
 use axum::extract::Multipart;
-use axum::extract::{Json, Path};
+use axum::extract::{Json, Path, Query};
 use axum_valid::Valid;
 use diesel::{
     ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection,
@@ -21,7 +21,9 @@ use crate::schema::repo;
 
 const UPLOAD_DIR: &str = "upload";
 
-pub async fn preview(Valid(Json(dto)): Valid<Json<VisualizerMethodDto>>) -> Result<Json<Preview>> {
+pub async fn preview(
+    Valid(Query(dto)): Valid<Query<VisualizerMethodDto>>,
+) -> Result<Json<Preview>> {
     info!("Preview dto: {dto:?}");
     let mut grid = visualizer::CommitGrid::new(dto.start_date);
 

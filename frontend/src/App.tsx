@@ -5,13 +5,14 @@ import Image from "./components/Image.tsx";
 import Random from "./components/Random.tsx";
 import Text from "./components/Text.tsx";
 import TextFilePattern from "./components/TextFilePattern.tsx";
+import Toasts from "./components/Toasts.tsx";
 
 const tabs = [
   { name: "Daily", componentClass: Daily, defaultChecked: true },
   { name: "Random", componentClass: Random },
   // { name: "Text File Pattern", componentClass: TextFilePattern },
   // { name: "Image", componentClass: Image },
-  // { name: "Text", componentClass: Text },
+  { name: "Text", componentClass: Text },
 ];
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
           <div className="tabs tabs-box bg-base-100">{elements}</div>
         </div>
       </div>
+      <Toasts />
       <Footer />
     </>
   );

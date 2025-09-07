@@ -1,5 +1,13 @@
 import { isoDate } from "./utils.ts";
 
+enum VisualizerMethod {
+  Full = "Full",
+  Random = "Random",
+  PatternFile = "PatternFile",
+  Image = "Image",
+  Text = "Text",
+}
+
 enum CommitCount {
   Zero = "Zero",
   Few = "Few",
@@ -22,4 +30,4 @@ NEXT_6_MONTH.setMonth(TODAY.getMonth() + 6);
 const TODAY_STR = isoDate(TODAY);
 const NEXT_6_MONTH_STR = isoDate(NEXT_6_MONTH);
 
-export { CommitCount, ALL_COMMIT_COUNT, Font, SUNDAY, TODAY_STR, NEXT_6_MONTH_STR };
+export { VisualizerMethod, CommitCount, ALL_COMMIT_COUNT, Font, SUNDAY, TODAY_STR, NEXT_6_MONTH_STR };
