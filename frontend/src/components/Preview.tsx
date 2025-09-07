@@ -107,8 +107,8 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
   return (
     <div className="mb-4 flex flex-col items-start">
       <h2 className="font-bold text-lg mb-2">Preview</h2>
-      <div className="pb-4 pt-3 pl-8 mb-2 overflow-x-scroll w-full">
-        <div className="grid grid-rows-8 grid-flow-col gap-1.5" aria-label="commit-graph">
+      <div className="pb-4 pt-3 pl-8 mb-2 graph-container overflow-x-scroll">
+        <div className="grid grid-rows-8 grid-flow-col gap-1.5 justify-start" aria-label="commit-graph">
           <div key="First" />
           <div key="Sun" />
           <div key="Mon" className="mr-2 font-bold">
@@ -154,7 +154,7 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
         >
           How GitHub calculate contribution?
         </a>
-        <div className="flex gap-1">
+        <div className="gap-1 hidden sm:flex">
           Less &nbsp;
           {COMMIT_COUNT_VALS.map(commit => (
             <div key={"" + commit} className={`w-5 h-5 inline-block rounded-sm border ${getColorForCommit(commit)}`} />

@@ -27,3 +27,15 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
+
+.graph-container {
+  width: calc(100vw - 4rem);
+
+  @media (width >= 24rem) {
+    width: calc(100vw - 5rem);
+  }
+
+  @media (width >= 57rem) {
+    width: 55rem;
+  }
+}

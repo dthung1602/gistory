@@ -24,7 +24,7 @@ function SelectPattern() {
 
   return (
     <div className="w-full flex justify-center p-4">
-      <div className="max-w-[900px]">
+      <div className="">
         <div className="text-xl font-bold px-1 py-4">Select pattern type</div>
         <div className="tabs tabs-box bg-base-100">
           {Object.entries(TABS).map(([tabId, { tabLabel, componentClass, defaultChecked = false }]) => [
