@@ -11,7 +11,7 @@ const tabs = [
   { name: "Daily", componentClass: Daily, defaultChecked: true },
   { name: "Random", componentClass: Random },
   { name: "Text File Pattern", componentClass: TextFilePattern },
-  // { name: "Image", componentClass: Image },
+  { name: "Image", componentClass: Image },
   { name: "Text", componentClass: Text },
 ];
 
