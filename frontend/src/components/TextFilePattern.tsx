@@ -17,18 +17,15 @@ function TextFilePattern() {
 
   const [data, setData, setDataAtIndex] = usePreviewData();
 
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const handleGenerate = useCallback(() => {
-    // TODO
-    console.log("click");
-  }, []);
 
   const hasError = startDateErr || fileErr;
 
   useEffect(() => {
     if (file == null) return;
 
-    setLoading(true);
+    setUploading(true);
     const [reqPromise, controller] = api.upload(file);
 
     reqPromise
@@ -37,13 +34,13 @@ function TextFilePattern() {
         setFileId(uuid);
       })
       .catch(api.errHandler(addToast, setFileErr))
-      .finally(() => setLoading(false));
+      .finally(() => setUploading(false));
 
     return () => {
       controller.abort("component dismount");
-      setLoading(false);
+      setUploading(false);
     };
-  }, [file]);
+  }, [addToast, file, setFileErr, setFileId]);
 
   useEffect(() => {
     if (!fileId || hasError) return;
@@ -67,7 +64,7 @@ function TextFilePattern() {
       controller.abort("component dismount");
       setLoading(false);
     };
-  }, [fileId, startDate]);
+  }, [fileId, hasError, setData, setFileErr, startDate]);
 
   return (
     <PatternTab
@@ -81,9 +78,10 @@ function TextFilePattern() {
       startDate={startDate}
       data={data}
       setDataAtIndex={setDataAtIndex}
+      loading={loading}
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
-      <InputFile legend="Pattern file" accept="text/plain" onChange={onChange} error={fileErr} />
+      <InputFile legend="Pattern file" accept="text/plain" onChange={onChange} error={fileErr} uploading={uploading} />
     </PatternTab>
   );
 }

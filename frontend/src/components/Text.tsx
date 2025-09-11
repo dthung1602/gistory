@@ -14,7 +14,7 @@ import PatternTab from "./PatternTab.tsx";
 function Text() {
   const { addToast } = useContext(ToastContext);
 
-  const [startDate, onStartDateChange, startDateErr] = useDateInput();
+  const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
   const [commitCount, onCommitCountChange] = useCommitCountInput();
   const [font, onFontChange] = useFontInput();
   const [text, onTextChange, textInputRef] = useTextInput(250);
@@ -24,10 +24,6 @@ function Text() {
   const hasError = !!startDateErr || !text;
 
   const [loading, setLoading] = useState(false);
-  const handleGenerate = useCallback(() => {
-    // TODO
-    console.log("click");
-  }, []);
 
   useEffect(() => {
     if (hasError) return;
@@ -64,6 +60,7 @@ function Text() {
       startDate={startDate}
       data={data}
       setDataAtIndex={setDataAtIndex}
+      loading={loading}
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputCommitCount value={commitCount} onChange={onCommitCountChange} />

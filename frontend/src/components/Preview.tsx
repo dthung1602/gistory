@@ -8,6 +8,7 @@ type Prop = {
   readonly startDate: string;
   readonly data: CommitCount[];
   readonly setDataAtIndex: (commitCount: CommitCount, idx: number) => void;
+  readonly loading?: boolean;
 };
 
 type DataCell = {
@@ -52,7 +53,7 @@ function addEmptyDataCells(cells: Cell[], n: number) {
   }
 }
 
-function Preview({ startDate, data, setDataAtIndex }: Prop) {
+function Preview({ startDate, data, setDataAtIndex, loading = false }: Prop) {
   const cells = useMemo(() => {
     const date = new Date(startDate);
     const newCells: Cell[] = [];
@@ -105,8 +106,11 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
   }, [startDate, data, setDataAtIndex]);
 
   return (
-    <div className="mb-4 flex flex-col items-start">
-      <h2 className="font-bold text-lg mb-2">Preview</h2>
+    <div className="mb-4 flex flex-col items-center">
+      <h2 className="font-bold text-lg mb-2 w-full">
+        Preview
+        {loading ? <span className="loading loading-dots loading-sm" /> : null}
+      </h2>
       <div className="pb-4 pt-3 pl-8 mb-2 graph-container overflow-x-scroll">
         <div className="grid grid-rows-8 grid-flow-col gap-1.5 justify-start" aria-label="commit-graph">
           <div key="First" />
@@ -140,7 +144,7 @@ function Preview({ startDate, data, setDataAtIndex }: Prop) {
                 key={cell.key}
                 onClick={cell.onClick}
                 className={`w-5 h-5 rounded-xs tooltip tooltip-info foo hover:scale-110 hover:z-10
-                      cursor-pointer transition-colors duration-250 ${colorClass} ${borderClass}`}
+                      cursor-pointer transition-colors duration-100 ${colorClass} ${borderClass}`}
                 data-tip={cell.cellLabel}
               />
             );

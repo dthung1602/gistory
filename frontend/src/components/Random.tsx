@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { ALL_COMMIT_COUNT, NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
 import { useDateInput, usePreviewData } from "../hooks.ts";
@@ -13,12 +13,6 @@ function Random() {
 
   const hasError = startDateErr || endDateErr;
 
-  const [loading, setLoading] = useState(false);
-  const handleGenerate = useCallback(() => {
-    // TODO
-    console.log("click");
-  }, []);
-
   useEffect(() => {
     if (hasError) return;
     const total = dayDiff(endDate, startDate) + 1;
@@ -27,7 +21,7 @@ function Random() {
       newData.push(randomCommitCount());
     }
     setData(newData);
-  }, [startDate, endDate]);
+  }, [startDate, endDate, hasError, setData]);
 
   return (
     <PatternTab
@@ -36,8 +30,6 @@ function Random() {
       startDate={startDate}
       data={data}
       setDataAtIndex={setDataAtIndex}
-      isGenerating={loading}
-      onGenerate={hasError ? undefined : handleGenerate}
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputDate legend="End date" date={endDate} onDateChange={onEndDateChange} dateErr={endDateErr} />

@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
@@ -17,18 +17,15 @@ function Image() {
 
   const [data, setData, setDataAtIndex] = usePreviewData();
 
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const handleGenerate = useCallback(() => {
-    // TODO
-    console.log("click");
-  }, []);
 
   const hasError = startDateErr || fileErr;
 
   useEffect(() => {
     if (file == null) return;
 
-    setLoading(true);
+    setUploading(true);
     const [reqPromise, controller] = api.upload(file);
 
     reqPromise
@@ -37,13 +34,13 @@ function Image() {
         setFileId(uuid);
       })
       .catch(api.errHandler(addToast, setFileErr))
-      .finally(() => setLoading(false));
+      .finally(() => setUploading(false));
 
     return () => {
       controller.abort("component dismount");
-      setLoading(false);
+      setUploading(false);
     };
-  }, [file]);
+  }, [addToast, file, setFileErr, setFileId]);
 
   useEffect(() => {
     if (!fileId || hasError) return;
@@ -67,7 +64,7 @@ function Image() {
       controller.abort("component dismount");
       setLoading(false);
     };
-  }, [fileId, startDate]);
+  }, [addToast, fileId, hasError, setData, setFileErr, startDate]);
 
   return (
     <PatternTab
@@ -76,9 +73,10 @@ function Image() {
       startDate={startDate}
       data={data}
       setDataAtIndex={setDataAtIndex}
+      loading={loading}
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
-      <InputFile legend="Image" accept="image/*" onChange={onChange} />
+      <InputFile legend="Image" accept="image/*" uploading={uploading} onChange={onChange} />
     </PatternTab>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
 import { useCommitCountInput, useDateInput, usePreviewData } from "../hooks.ts";
@@ -15,17 +15,11 @@ function Daily() {
 
   const hasError = startDateErr || endDateErr;
 
-  const [loading, setLoading] = useState(false);
-  const handleGenerate = useCallback(() => {
-    // TODO
-    console.log("click");
-  }, []);
-
   useEffect(() => {
     if (hasError) return;
     const newData = Array(dayDiff(endDate, startDate) + 1).fill(commitCount);
     setData(newData);
-  }, [startDate, endDate, commitCount]);
+  }, [startDate, endDate, commitCount, hasError, setData]);
 
   return (
     <PatternTab
@@ -34,8 +28,6 @@ function Daily() {
       startDate={startDate}
       data={data}
       setDataAtIndex={setDataAtIndex}
-      isGenerating={loading}
-      onGenerate={hasError ? undefined : handleGenerate}
     >
       <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
       <InputDate legend="End date" date={endDate} onDateChange={onEndDateChange} dateErr={endDateErr} />
