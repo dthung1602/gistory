@@ -24,6 +24,19 @@ pub enum CommitCount {
     ALot = 4,
 }
 
+impl From<char> for CommitCount {
+    fn from(value: char) -> Self {
+        let num = value.to_digit(10).unwrap_or(0);
+        match num {
+            1 => CommitCount::Few,
+            2 => CommitCount::Some,
+            3 => CommitCount::Many,
+            4 => CommitCount::ALot,
+            _ => CommitCount::Zero,
+        }
+    }
+}
+
 impl CommitCount {
     pub fn value(self) -> usize {
         match self {
@@ -45,6 +58,10 @@ pub struct CommitGrid {
 impl CommitGrid {
     pub fn get_data(&self) -> &[CommitCount] {
         self.data.as_slice()
+    }
+
+    pub fn set_data(&mut self, data: Vec<CommitCount>) {
+        self.data = data;
     }
 
     pub async fn populate_repo(&self, repo: &mut Repo) -> Result<()> {

@@ -8,6 +8,8 @@ use std::path::PathBuf;
 use clap::{ArgAction, ArgGroup, Command, arg, value_parser};
 use log::debug;
 
+use crate::visualizer::CommitCount;
+
 #[tokio::main]
 async fn main() -> error::Result<()> {
     env_logger::init();
@@ -84,8 +86,11 @@ async fn main() -> error::Result<()> {
         .arg(
             arg!(-t --"text" <TEXT> "Print given text on grid")
         )
+        .arg(
+            arg!(-x --"raw" <RAW_PATERN> "Raw commit count pattern with characters 0->4. Invalid characters are considered as 0")
+        )
         .group(
-            ArgGroup::new("method").args(["full", "random", "pattern-file", "image", "text"]).required(true).multiple(false)
+            ArgGroup::new("method").args(["full", "random", "pattern-file", "image", "text", "raw"]).required(true).multiple(false)
         )
         .get_matches();
 
@@ -114,6 +119,10 @@ async fn main() -> error::Result<()> {
             .get_one::<visualizer::CommitCount>("commit-count")
             .unwrap();
         grid.show_text(text.clone(), *font, *commit_count)?;
+    } else if matches.contains_id("raw") {
+        let raw_pattern = matches.get_one::<String>("raw").unwrap();
+        let commit_counts: Vec<CommitCount> = raw_pattern.chars().map(|c| c.into()).collect();
+        grid.set_data(commit_counts);
     } else {
         unreachable!("No method flag provided");
     };

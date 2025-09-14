@@ -48,6 +48,10 @@ pub async fn preview(
             let commit_count = dto.commit_count.unwrap();
             grid.show_text(text.clone(), font, commit_count)?;
         }
+        RepoVisualizeMethod::RawPattern => {
+            let raw_pattern = dto.raw_pattern.unwrap();
+            grid.set_data(raw_pattern);
+        }
     }
 
     Ok(Json(Preview {

@@ -18,6 +18,7 @@ pub enum RepoVisualizeMethod {
     PatternFile = 2,
     Image = 3,
     Text = 4,
+    RawPattern = 5,
 }
 
 #[derive(Clone, Debug, Validate, Deserialize)]
@@ -61,6 +62,7 @@ pub struct VisualizerMethodDto {
     pub input_file: Option<String>,
     #[validate(length(min = 1, max = 64))]
     pub text: Option<String>,
+    pub raw_pattern: Option<Vec<CommitCount>>,
 }
 
 pub fn validate_visualizer_method_dto(dto: &VisualizerMethodDto) -> Result<(), ValidationError> {
@@ -99,6 +101,13 @@ pub fn validate_visualizer_method_dto(dto: &VisualizerMethodDto) -> Result<(), V
             }
             if dto.commit_count.is_none() {
                 return Err(ValidationError::new("Full method requires commit_count"));
+            }
+        }
+        RepoVisualizeMethod::RawPattern => {
+            if dto.raw_pattern.is_none() {
+                return Err(ValidationError::new(
+                    "RawPattern method requires raw_pattern",
+                ));
             }
         }
     }
