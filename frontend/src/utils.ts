@@ -1,6 +1,10 @@
 import { CommitCount } from "./constants.ts";
 
 function debounce(callback: (...args: unknown[]) => unknown, wait: number) {
+  if (wait === 0) {
+    return callback;
+  }
+
   let timeoutId: number | undefined = undefined;
   return (...args: unknown[]) => {
     window.clearTimeout(timeoutId);

@@ -1,14 +1,13 @@
-import { type JSX, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 
+import type { CommitCount } from "../constants.ts";
+import { FormContext } from "../context.tsx";
+import type { TabId, TabSetting } from "../types.ts";
 import Daily from "./Daily.tsx";
 import Image from "./Image.tsx";
 import Random from "./Random.tsx";
 import Text from "./Text.tsx";
 import TextFilePattern from "./TextFilePattern.tsx";
-
-type TabComponent = (prop: { key: string }) => JSX.Element;
-type TabId = "Daily" | "Random" | "TextFilePattern" | "Image" | "Text";
-type TabSetting = { tabLabel: string; componentClass: TabComponent; defaultChecked?: boolean };
 
 const TABS: Record<TabId, TabSetting> = {
   Daily: { tabLabel: "Daily", componentClass: Daily, defaultChecked: true },
@@ -19,31 +18,59 @@ const TABS: Record<TabId, TabSetting> = {
 };
 
 function SelectPattern() {
+  const { updateFormContext } = useContext(FormContext);
   const [tab, setTab] = useState<TabId>("Daily");
-  const handleTabClick = (newTab: TabId) => () => setTab(newTab);
+  const [tabsData, setTabsData] = useState<Record<TabId, CommitCount[]>>({
+    Daily: [],
+    Random: [],
+    TextFilePattern: [],
+    Image: [],
+    Text: [],
+  });
+
+  const [handleTabClickFuncs, setTabDataFuncs] = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    const handleTabClickFuncs: Record<TabId, () => void> = {};
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    const setTabDataFuncs: Record<TabId, (data: CommitCount[]) => void> = {};
+
+    for (const tabId in TABS) {
+      handleTabClickFuncs[tabId as TabId] = () => {
+        setTab(tabId as TabId);
+      };
+      setTabDataFuncs[tabId as TabId] = (data: CommitCount[]) => {
+        setTabsData(prev => ({ ...prev, [tabId as TabId]: data }));
+      };
+    }
+    return [handleTabClickFuncs, setTabDataFuncs];
+  }, []);
+
+  useEffect(() => {
+    updateFormContext({ data: tabsData[tab] });
+  }, [tab, tabsData, updateFormContext]);
 
   return (
-    <div className="w-full flex justify-center p-4">
-      <div className="">
-        <div className="text-xl font-bold px-1 py-4">Select pattern type</div>
-        <div className="tabs tabs-box bg-base-100">
-          {Object.entries(TABS).map(([tabId, { tabLabel, componentClass, defaultChecked = false }]) => [
-            <input
-              key={`tab-label-${tabLabel}`}
-              type="radio"
-              name="method"
-              className="tab [--tab-bg:var(--color-primary)] text-primary-content"
-              aria-label={tabLabel}
-              defaultChecked={defaultChecked}
-              onClick={handleTabClick(tabId as TabId)}
-            />,
-            <div key={`tab-content-${tabLabel}`} className="tab-content py-6">
-              {componentClass({ key: tabLabel })}
-            </div>,
-          ])}
-        </div>
+    <>
+      <div className="text-xl font-bold px-1 py-4">Select pattern type</div>
+      <div className="tabs tabs-box bg-base-100 p-0">
+        {Object.entries(TABS).map(([tabId, { tabLabel, componentClass, defaultChecked = false }]) => [
+          <input
+            key={`tab-label-${tabLabel}`}
+            type="radio"
+            name="method"
+            className="tab [--tab-bg:var(--color-primary)] text-primary-content"
+            aria-label={tabLabel}
+            defaultChecked={defaultChecked}
+            onClick={handleTabClickFuncs[tabId as TabId]}
+          />,
+          <div key={`tab-content-${tabLabel}`} className="tab-content py-6">
+            {componentClass({ key: tabLabel, updatePreviewData: setTabDataFuncs[tabId as TabId] })}
+          </div>,
+        ])}
       </div>
-    </div>
+    </>
   );
 }
 

@@ -106,12 +106,12 @@ function Preview({ startDate, data, setDataAtIndex, loading = false }: Prop) {
   }, [startDate, data, setDataAtIndex]);
 
   return (
-    <div className="mb-4 flex flex-col items-center">
+    <div className="flex flex-col items-center">
       <h2 className="font-bold text-lg mb-2 w-full">
         Preview
         {loading ? <span className="loading loading-dots loading-sm" /> : null}
       </h2>
-      <div className="pb-4 pt-3 pl-8 mb-2 graph-container overflow-x-scroll">
+      <div className="pb-4 pl-8 mb-2 form-container overflow-x-scroll">
         <div className="grid grid-rows-8 grid-flow-col gap-1.5 justify-start" aria-label="commit-graph">
           <div key="First" />
           <div key="Sun" />
@@ -151,7 +151,7 @@ function Preview({ startDate, data, setDataAtIndex, loading = false }: Prop) {
           })}
         </div>
       </div>
-      <div className="flex justify-between w-full text-info">
+      <div className="flex justify-between w-full text-info my-2">
         <a
           className="hover:underline"
           href="https://docs.github.com/articles/why-are-my-contributions-not-showing-up-on-my-profile"

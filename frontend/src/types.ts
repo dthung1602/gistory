@@ -1,4 +1,4 @@
-import { type ChangeEvent, type MouseEvent } from "react";
+import type { ChangeEvent, JSX, MouseEvent } from "react";
 
 import type { CommitCount } from "./constants.ts";
 
@@ -22,6 +22,25 @@ type PreviewResult = {
   data: CommitCount[];
 };
 
+type CreateRepoData = {
+  name: string;
+  username: string;
+  email: string;
+  branch: string;
+  timezone: string;
+  startDate: string;
+  data: CommitCount[];
+};
+
+type UpdateCreateRepoData = (newData: Partial<CreateRepoData>) => void;
+
+type UpdatePreviewData = (data: CommitCount[]) => void;
+type SelectPatternTabProp = { updatePreviewData: UpdatePreviewData };
+
+type TabComponent = (prop: SelectPatternTabProp & { key: string }) => JSX.Element;
+type TabId = "Daily" | "Random" | "TextFilePattern" | "Image" | "Text";
+type TabSetting = { tabLabel: string; componentClass: TabComponent; defaultChecked?: boolean };
+
 export type {
   OnInputChange,
   OnSelectChange,
@@ -30,4 +49,11 @@ export type {
   OnButtonClick,
   FileUploadResult,
   PreviewResult,
+  CreateRepoData,
+  UpdateCreateRepoData,
+  UpdatePreviewData,
+  SelectPatternTabProp,
+  TabComponent,
+  TabId,
+  TabSetting,
 };

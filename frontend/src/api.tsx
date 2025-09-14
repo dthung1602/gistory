@@ -1,7 +1,7 @@
 import type { Dispatch } from "react";
 
 import { type CommitCount, Font, VisualizerMethod } from "./constants.ts";
-import type { AddToast } from "./context.ts";
+import type { AddToast } from "./context.tsx";
 
 const BACKEND_ENDPOINT = import.meta.env.BACKEND_ENDPOINT || "http://localhost:5173/api/";
 

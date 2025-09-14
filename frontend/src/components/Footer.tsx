@@ -1,6 +1,6 @@
 function Footer() {
   return (
-    <footer className="footer sm:footer-horizontal bg-base-200 text-base-content p-10">
+    <footer className="footer sm:footer-horizontal bg-base-200 text-base-content p-10 sm:mt-16 mt-8">
       <aside>
         <h2 className="gradient-primary-content text-3xl">Gistory</h2>
         <p className="gradient-info-content">Commit patterns on GitHub profile</p>

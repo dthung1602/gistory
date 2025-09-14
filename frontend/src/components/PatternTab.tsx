@@ -20,7 +20,7 @@ function PatternTab({ title, subtitle, children, startDate, data, setDataAtIndex
       <div className="card-body">
         <h2 className="card-title">{title}</h2>
         <p>{subtitle}</p>
-        <div className="my-4 grid gap-x-4 gap-y-1 grid-cols-1 md:grid-cols-2">{children}</div>
+        <div className="my-4 grid gap-x-4 gap-y-1 grid-cols-1 sm:grid-cols-2">{children}</div>
         <Preview startDate={startDate} data={data} setDataAtIndex={setDataAtIndex} loading={loading} />
       </div>
     </div>

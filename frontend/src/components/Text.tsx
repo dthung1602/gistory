@@ -1,25 +1,25 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
-import { ToastContext } from "../context.ts";
-import { useCommitCountInput, useDateInput, useFontInput, usePreviewData, useTextInput } from "../hooks.ts";
-import type { PreviewResult } from "../types.ts";
+import { ToastContext } from "../context.tsx";
+import { useCommitCountInput, useFontInput, usePreviewData, useStartDateInput, useTextInput } from "../hooks.ts";
+import type { PreviewResult, SelectPatternTabProp } from "../types.ts";
 import InputCommitCount from "./InputCommitCount.tsx";
 import InputDate from "./InputDate.tsx";
 import InputFont from "./InputFont.tsx";
 import InputText from "./InputText.tsx";
 import PatternTab from "./PatternTab.tsx";
 
-function Text() {
+function Text({ updatePreviewData }: SelectPatternTabProp) {
   const { addToast } = useContext(ToastContext);
 
-  const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
+  const [startDate, onStartDateChange, startDateErr] = useStartDateInput({ mustBeSunday: true });
   const [commitCount, onCommitCountChange] = useCommitCountInput();
   const [font, onFontChange] = useFontInput();
-  const [text, onTextChange, textInputRef] = useTextInput(250);
+  const [text, , onTextChange, textInputRef] = useTextInput({ debounceTime: 350 });
 
-  const [data, setData, setDataAtIndex] = usePreviewData();
+  const [data, setData, setDataAtIndex] = usePreviewData(updatePreviewData);
 
   const hasError = !!startDateErr || !text;
 
@@ -62,12 +62,13 @@ function Text() {
       setDataAtIndex={setDataAtIndex}
       loading={loading}
     >
-      <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
+      <InputDate legend="Start date" date={startDate} onChange={onStartDateChange} error={startDateErr} />
       <InputCommitCount value={commitCount} onChange={onCommitCountChange} />
       <InputFont value={font} onChange={onFontChange} />
       <InputText
         legend="Text"
         placeholder="Keep it under 64 chars"
+        className="col-span-2"
         maxLength={64}
         onChange={onTextChange}
         inputRef={textInputRef}

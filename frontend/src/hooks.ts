@@ -4,13 +4,15 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
 } from "react";
 
 import { CommitCount, Font, SUNDAY, TODAY_STR } from "./constants.ts";
-import type { OnInputChange, OnSelectChange, SetDataAtIndexFunc } from "./types.ts";
+import { FormContext } from "./context.tsx";
+import type { OnInputChange, OnSelectChange, SetDataAtIndexFunc, UpdatePreviewData } from "./types.ts";
 import { debounce } from "./utils.ts";
 
 type UseDateInputArg = {
@@ -18,12 +20,13 @@ type UseDateInputArg = {
   mustBeSunday?: boolean;
   defaultValue?: string;
 };
+type UseDateInputReturn = [string, OnInputChange, string];
 
-function useDateInput({ minDate = "0", mustBeSunday = false, defaultValue = TODAY_STR }: UseDateInputArg = {}): [
-  string,
-  OnInputChange,
-  string,
-] {
+function useDateInput({
+  minDate = "0",
+  mustBeSunday = false,
+  defaultValue = TODAY_STR,
+}: UseDateInputArg = {}): UseDateInputReturn {
   const [date, setDate] = useState<string>(defaultValue);
   const [error, setError] = useState<string>("");
 
@@ -49,6 +52,21 @@ function useDateInput({ minDate = "0", mustBeSunday = false, defaultValue = TODA
   }, [minDate, mustBeSunday, date]);
 
   return [date, onChange, error];
+}
+
+function useStartDateInput({
+  minDate = "0",
+  mustBeSunday = false,
+  defaultValue = TODAY_STR,
+}: UseDateInputArg = {}): UseDateInputReturn {
+  const { updateFormContext } = useContext(FormContext);
+  const value = useDateInput({ minDate, mustBeSunday, defaultValue });
+
+  useEffect(() => {
+    updateFormContext({ startDate: value[0] });
+  }, [value[0], updateFormContext]);
+
+  return value;
 }
 
 function useEnumInput<E extends string>(enumObj: Record<string, E>, defaultValue: E): [E, OnSelectChange] {
@@ -102,22 +120,106 @@ function useFileInput(): UseFileInput {
   return { file, onChange, fileId, setFileId, fileErr, setFileErr };
 }
 
-function useTextInput(debounceTime: number = 0): [string, OnInputChange, RefObject<HTMLInputElement | null>] {
+type ValidatorFunc = (val: string) => string;
+
+type UseTextInputArg = {
+  debounceTime?: number;
+  validator?: ValidatorFunc;
+};
+
+type UseTextInputReturn = [string, string, OnInputChange, RefObject<HTMLInputElement | null>];
+
+function useTextInput({ debounceTime = 0, validator }: UseTextInputArg): UseTextInputReturn {
   const [text, setText] = useState("");
+  const [error, setError] = useState<string>("");
+
   const ref = useRef<HTMLInputElement>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const onChange = useCallback(
     debounce(() => {
       if (ref.current != null) {
         setText(ref.current.value);
+        if (validator) {
+          setError(validator(ref.current.value));
+        }
       }
     }, debounceTime),
     [setText, ref],
   );
-  return [text, onChange, ref];
+
+  return [text, error, onChange, ref];
 }
 
-function usePreviewData(): [CommitCount[], Dispatch<SetStateAction<CommitCount[]>>, SetDataAtIndexFunc] {
+type UseInputHookNoValidatorArg = {
+  debounceTime?: number;
+  regex: RegExp;
+  errorMessage: string;
+};
+
+function useTextInputRegex({ regex, debounceTime = 0, errorMessage }: UseInputHookNoValidatorArg): UseTextInputReturn {
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string>("");
+
+  const ref = useRef<HTMLInputElement>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const onChange = useCallback(
+    debounce(() => {
+      if (ref.current != null) {
+        setText(ref.current.value);
+        setError(ref.current.value.match(regex) ? "" : errorMessage);
+      }
+    }, debounceTime),
+    [setText, ref],
+  );
+
+  return [text, error, onChange, ref];
+}
+
+const EMAIL_INPUT_ARGS: UseInputHookNoValidatorArg = {
+  regex: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  debounceTime: 350,
+  errorMessage: "Invalid email address",
+};
+
+function useEmailInput(): UseTextInputReturn {
+  const ret = useTextInputRegex(EMAIL_INPUT_ARGS);
+  return ret;
+}
+
+const TIMEZONE_INPUT_ARGS: UseInputHookNoValidatorArg = {
+  regex: /^[+-][0-9]{4}$/,
+  debounceTime: 50,
+  errorMessage: "Timezone must have format like +0700 -0430",
+};
+
+function useTimezoneInput(): UseTextInputReturn {
+  const ret = useTextInputRegex(TIMEZONE_INPUT_ARGS);
+  return ret;
+}
+
+const GITHUB_NAME_INPUT_ARGS: UseInputHookNoValidatorArg = {
+  regex: /^[a-zA-Z0-9-._]{1,64}$/,
+  debounceTime: 50,
+  errorMessage: 'Alphanumeric and "-._". No more than 64 chars',
+};
+
+function useGithubName(): UseTextInputReturn {
+  return useTextInputRegex(GITHUB_NAME_INPUT_ARGS);
+}
+
+const GITHUB_BRANCH_INPUT_ARGS: UseInputHookNoValidatorArg = {
+  regex: /^[a-zA-Z0-9-._/]{1,64}$/,
+  debounceTime: 50,
+  errorMessage: 'Alphanumeric and "-._/". No more than 64 chars',
+};
+
+function useGithubBranch(): UseTextInputReturn {
+  return useTextInputRegex(GITHUB_BRANCH_INPUT_ARGS);
+}
+
+function usePreviewData(
+  updateData: UpdatePreviewData,
+): [CommitCount[], Dispatch<SetStateAction<CommitCount[]>>, SetDataAtIndexFunc] {
   const [data, setData] = useState<CommitCount[]>(mockData);
 
   const setDataAtIndex = useCallback(
@@ -129,9 +231,23 @@ function usePreviewData(): [CommitCount[], Dispatch<SetStateAction<CommitCount[]
     [data],
   );
 
+  useEffect(() => updateData(data), [data, updateData]);
+
   return [data, setData, setDataAtIndex];
 }
 
 const mockData = Array(180).fill(CommitCount.Some);
 
-export { useDateInput, useCommitCountInput, useFontInput, useFileInput, useTextInput, usePreviewData };
+export {
+  useDateInput,
+  useStartDateInput,
+  useCommitCountInput,
+  useFontInput,
+  useFileInput,
+  useTextInput,
+  useEmailInput,
+  useTimezoneInput,
+  useGithubName,
+  useGithubBranch,
+  usePreviewData,
+};

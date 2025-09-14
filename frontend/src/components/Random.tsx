@@ -1,15 +1,16 @@
 import { useEffect } from "react";
 
 import { ALL_COMMIT_COUNT, NEXT_6_MONTH_STR, TODAY_STR } from "../constants.ts";
-import { useDateInput, usePreviewData } from "../hooks.ts";
+import { useDateInput, usePreviewData, useStartDateInput } from "../hooks.ts";
+import type { SelectPatternTabProp } from "../types.ts";
 import { dayDiff } from "../utils.ts";
 import InputDate from "./InputDate.tsx";
 import PatternTab from "./PatternTab.tsx";
 
-function Random() {
-  const [startDate, onStartDateChange, startDateErr] = useDateInput({ defaultValue: TODAY_STR });
+function Random({ updatePreviewData }: SelectPatternTabProp) {
+  const [startDate, onStartDateChange, startDateErr] = useStartDateInput({ defaultValue: TODAY_STR });
   const [endDate, onEndDateChange, endDateErr] = useDateInput({ defaultValue: NEXT_6_MONTH_STR, minDate: startDate });
-  const [data, setData, setDataAtIndex] = usePreviewData();
+  const [data, setData, setDataAtIndex] = usePreviewData(updatePreviewData);
 
   const hasError = startDateErr || endDateErr;
 
@@ -31,8 +32,8 @@ function Random() {
       data={data}
       setDataAtIndex={setDataAtIndex}
     >
-      <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
-      <InputDate legend="End date" date={endDate} onDateChange={onEndDateChange} dateErr={endDateErr} />
+      <InputDate legend="Start date" date={startDate} onChange={onStartDateChange} error={startDateErr} />
+      <InputDate legend="End date" date={endDate} onChange={onEndDateChange} error={endDateErr} />
     </PatternTab>
   );
 }

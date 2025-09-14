@@ -1,21 +1,21 @@
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import api from "../api.tsx";
 import { VisualizerMethod } from "../constants.ts";
-import { ToastContext } from "../context.ts";
-import { useDateInput, useFileInput, usePreviewData } from "../hooks.ts";
-import type { FileUploadResult, PreviewResult } from "../types.ts";
+import { ToastContext } from "../context.tsx";
+import { useFileInput, usePreviewData, useStartDateInput } from "../hooks.ts";
+import type { FileUploadResult, PreviewResult, SelectPatternTabProp } from "../types.ts";
 import InputDate from "./InputDate.tsx";
 import InputFile from "./InputFile.tsx";
 import PatternTab from "./PatternTab.tsx";
 
-function TextFilePattern() {
+function TextFilePattern({ updatePreviewData }: SelectPatternTabProp) {
   const { addToast } = useContext(ToastContext);
 
-  const [startDate, onStartDateChange, startDateErr] = useDateInput({ mustBeSunday: true });
+  const [startDate, onStartDateChange, startDateErr] = useStartDateInput({ mustBeSunday: true });
   const { file, onChange, fileId, setFileId, fileErr, setFileErr } = useFileInput();
 
-  const [data, setData, setDataAtIndex] = usePreviewData();
+  const [data, setData, setDataAtIndex] = usePreviewData(updatePreviewData);
 
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ function TextFilePattern() {
       setDataAtIndex={setDataAtIndex}
       loading={loading}
     >
-      <InputDate legend="Start date" date={startDate} onDateChange={onStartDateChange} dateErr={startDateErr} />
+      <InputDate legend="Start date" date={startDate} onChange={onStartDateChange} error={startDateErr} />
       <InputFile legend="Pattern file" accept="text/plain" onChange={onChange} error={fileErr} uploading={uploading} />
     </PatternTab>
   );

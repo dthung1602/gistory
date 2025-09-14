@@ -1,10 +1,9 @@
 import { useContext } from "react";
 
-import { ToastContext } from "../context.ts";
+import { ToastContext } from "../context.tsx";
 
 function Toasts() {
   const { toasts } = useContext(ToastContext);
-  console.log(toasts);
   return (
     <div className="toast toast-top toast-end">
       {toasts.map(({ type, content, key }) => (
