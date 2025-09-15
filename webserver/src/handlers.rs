@@ -1,59 +1,30 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Extension;
+use axum::body::Bytes;
 use axum::extract::Multipart;
+use axum::extract::multipart::Field;
 use axum::extract::{Json, Path, Query};
 use axum_valid::Valid;
 use diesel::{
     ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SelectableHelper, SqliteConnection,
 };
-use gistory::visualizer;
 use log::info;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
-use crate::dto::{CreateRepoDto, Preview, RepoVisualizeMethod, UploadResult, VisualizerMethodDto};
+use crate::constants::UPLOAD_DIR;
+use crate::dto::{CreateRepoDto, Preview, UploadResult, VisualizerMethodDto};
 use crate::error::{Error, FieldErr, Result};
 use crate::models::*;
 use crate::schema::repo;
-
-const UPLOAD_DIR: &str = "upload";
+use crate::tasks::{create_grid_from_dto, create_upload_file, generate_repo};
 
 pub async fn preview(
     Valid(Query(dto)): Valid<Query<VisualizerMethodDto>>,
 ) -> Result<Json<Preview>> {
     info!("Preview dto: {dto:?}");
-    let mut grid = visualizer::CommitGrid::new(dto.start_date);
-
-    match dto.method {
-        RepoVisualizeMethod::Full => {
-            grid.full(dto.commit_count.unwrap(), dto.end_date.unwrap())?;
-        }
-        RepoVisualizeMethod::Random => grid.random(dto.end_date.unwrap())?,
-        RepoVisualizeMethod::PatternFile => {
-            let mut path_buf = PathBuf::from(UPLOAD_DIR);
-            path_buf.push(dto.input_file.unwrap());
-            grid.read_pattern_file(&path_buf).await?;
-        }
-        RepoVisualizeMethod::Image => {
-            let mut path_buf = PathBuf::from(UPLOAD_DIR);
-            path_buf.push(dto.input_file.unwrap());
-            grid.read_image_file(&path_buf).await?;
-        }
-        RepoVisualizeMethod::Text => {
-            let text = dto.text.unwrap();
-            let font = dto.font.unwrap();
-            let commit_count = dto.commit_count.unwrap();
-            grid.show_text(text.clone(), font, commit_count)?;
-        }
-        RepoVisualizeMethod::RawPattern => {
-            let raw_pattern = dto.raw_pattern.unwrap();
-            grid.set_data(raw_pattern);
-        }
-    }
-
+    let grid = create_grid_from_dto(dto).await?;
     Ok(Json(Preview {
         data: grid.get_data().to_vec(),
     }))
@@ -68,18 +39,21 @@ pub async fn create_repo(
 
     let new_repo = Repo {
         uuid: uuid::Uuid::new_v4().to_string(),
-        name: create_repo_dto.name,
-        username: create_repo_dto.username,
-        email: create_repo_dto.email,
-        branch: create_repo_dto.branch,
+        name: create_repo_dto.name.clone(),
+        username: create_repo_dto.username.clone(),
+        email: create_repo_dto.email.clone(),
+        branch: create_repo_dto.branch.clone(),
         method: create_repo_dto.visualizer_method.method as i32,
+        status: RepoStatus::New,
     };
-    let res = diesel::insert_into(repo::table)
+    let repo = diesel::insert_into(repo::table)
         .values(&new_repo)
         .returning(Repo::as_returning())
         .get_result(&mut *conn)?;
 
-    Ok(Json(res))
+    tokio::spawn(generate_repo(create_repo_dto, repo.clone()));
+
+    Ok(Json(repo))
 }
 
 pub async fn get_repo(
@@ -127,22 +101,7 @@ pub async fn upload_file(mut multipart: Multipart) -> Result<Json<UploadResult>>
         .unwrap_or("application/octet-stream")
         .to_string();
 
-    // Generate a unique ID for the file
-    let file_id = uuid::Uuid::new_v4().to_string();
-    let file_path = format!("{}/{}", UPLOAD_DIR, file_id);
-
-    // Save the file
-    let mut file = fs::File::create(&file_path).await?;
-
-    // Write the file data
-    let data = field.bytes().await.map_err(|multipart_error| {
-        Error::InvalidInput(vec![FieldErr {
-            field: "file".to_string(),
-            message: format!("{multipart_error}"),
-        }])
-    })?;
-
-    file.write_all(&data).await?;
+    let (file_id, data) = create_upload_file(field).await?;
 
     let upload_result = UploadResult {
         uuid: file_id,

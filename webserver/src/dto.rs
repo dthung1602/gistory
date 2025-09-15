@@ -11,7 +11,7 @@ static NAME_REGEX: LazyLock<Regex> =
 static BRANCH_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9-._/]{1,64}$").unwrap());
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub enum RepoVisualizeMethod {
     Full = 0,
     Random = 1,

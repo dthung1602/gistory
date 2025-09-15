@@ -20,6 +20,7 @@ function GenerateButton() {
       return;
     }
 
+    // TODO call api to
     console.log("generate");
 
     setLoading(true);
