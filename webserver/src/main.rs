@@ -1,4 +1,5 @@
 mod constants;
+mod dbconnection;
 mod dto;
 mod error;
 mod handlers;
@@ -6,14 +7,12 @@ mod models;
 mod schema;
 mod tasks;
 
-use std::env;
 use std::sync::Arc;
 
 use axum::{
     Extension, Router,
     routing::{get, post},
 };
-use diesel::prelude::*;
 use dotenvy::dotenv;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
@@ -23,7 +22,7 @@ use tower_http::services::{ServeDir, ServeFile};
 async fn main() {
     dotenv().ok();
     env_logger::init();
-    let db = Arc::new(Mutex::new(establish_connection()));
+    let db = Arc::new(Mutex::new(dbconnection::establish_connection()));
 
     let app = Router::new()
         .route_service(
@@ -41,10 +40,4 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-pub fn establish_connection() -> SqliteConnection {
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }

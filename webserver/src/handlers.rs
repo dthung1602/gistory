@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use axum::Extension;
-use axum::body::Bytes;
 use axum::extract::Multipart;
-use axum::extract::multipart::Field;
 use axum::extract::{Json, Path, Query};
 use axum_valid::Valid;
 use diesel::{
@@ -31,11 +29,10 @@ pub async fn preview(
 }
 
 pub async fn create_repo(
-    Extension(conn): Extension<Arc<Mutex<SqliteConnection>>>,
+    Extension(conn_arc): Extension<Arc<Mutex<SqliteConnection>>>,
     Valid(Json(create_repo_dto)): Valid<Json<CreateRepoDto>>,
 ) -> Result<Json<Repo>> {
     info!("Create repo dto: {create_repo_dto:?}");
-    let mut conn = conn.lock().await;
 
     let new_repo = Repo {
         uuid: uuid::Uuid::new_v4().to_string(),
@@ -46,11 +43,15 @@ pub async fn create_repo(
         method: create_repo_dto.visualizer_method.method as i32,
         status: RepoStatus::New,
     };
-    let repo = diesel::insert_into(repo::table)
+    let query = diesel::insert_into(repo::table)
         .values(&new_repo)
-        .returning(Repo::as_returning())
-        .get_result(&mut *conn)?;
+        .returning(Repo::as_returning());
 
+    let mut conn = conn_arc.lock().await;
+    let repo = query.get_result(&mut *conn)?;
+    drop(conn);
+
+    // Spawn background task for repo generation; do not move the handler's connection handle into the task.
     tokio::spawn(generate_repo(create_repo_dto, repo.clone()));
 
     Ok(Json(repo))

@@ -1,19 +1,23 @@
-use std::io::SeekFrom;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_compression::tokio::write::ZstdEncoder;
 use axum::body::Bytes;
 use axum::extract::multipart::Field;
+use diesel::serialize::ToSql;
+use diesel::{ExpressionMethods, OptionalExtension, QueryResult, RunQueryDsl, SqliteConnection};
 use gistory::git;
 use gistory::visualizer::CommitGrid;
-use log::debug;
+use log::{debug, error, info};
 use tokio::fs;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncWriteExt, BufReader};
+use tokio::sync::Mutex;
 
 use crate::constants::{REPO_DOWNLOAD_DIR, UPLOAD_DIR};
+use crate::dbconnection;
 use crate::dto::{CreateRepoDto, RepoVisualizeMethod, VisualizerMethodDto};
 use crate::error::{Error, FieldErr, Result};
-use crate::models::Repo;
+use crate::models::{Repo, RepoStatus};
 
 pub async fn create_upload_file(field: Field<'_>) -> Result<(String, Bytes)> {
     // Generate a unique ID for the file
@@ -74,7 +78,7 @@ pub async fn compress_directory(path: impl AsRef<Path>) -> Result<()> {
     let archive_file = fs::File::create(&archive_file_path).await?;
 
     let mut compressed_file_path = path.to_path_buf();
-    compressed_file_path.set_file_name("zst");
+    compressed_file_path.set_extension("tar.zst");
     let compressed_file = fs::File::create(compressed_file_path).await?;
 
     let mut tar_builder = tokio_tar::Builder::new(archive_file);
@@ -88,35 +92,63 @@ pub async fn compress_directory(path: impl AsRef<Path>) -> Result<()> {
 
     let mut compressor = ZstdEncoder::new(compressed_file);
     tokio::io::copy(&mut archive_file_reader, &mut compressor).await?;
+    compressor.shutdown().await?;
+    let mut compressed_file = compressor.into_inner();
+    compressed_file.flush().await?;
+    drop(compressed_file);
+
+    fs::remove_file(archive_file_path).await?;
 
     Ok(())
 }
 
-pub async fn generate_repo(create_repo_dto: CreateRepoDto, repo: Repo) {
-    // TODO handle error
-    debug!("Start generating repo: {create_repo_dto:?}");
-    let grid = create_grid_from_dto(create_repo_dto.visualizer_method)
-        .await
-        .unwrap();
+pub async fn generate_repo(repo_dto: CreateRepoDto, db_repo: Repo) {
+    use std::env;
 
-    let mut working_dir = std::env::current_dir().unwrap();
+    use crate::schema::repo::dsl::{repo, status, uuid};
+
+    info!("Start generating repo: {} {:?}", db_repo.uuid, repo_dto);
+    let status_value = if do_generate_repo(repo_dto, &db_repo).await.is_ok() {
+        RepoStatus::Done
+    } else {
+        RepoStatus::Error
+    };
+    let query = diesel::update(repo)
+        .filter(uuid.eq(&db_repo.uuid))
+        .set(status.eq(status_value));
+
+    let mut conn = dbconnection::establish_connection();
+    let result = query.execute(&mut conn);
+    if let Err(err) = result {
+        error!("Error updating repo status: {err:?}");
+    } else {
+        info!("Created repo for {}", db_repo.uuid);
+    }
+}
+
+async fn do_generate_repo(repo_dto: CreateRepoDto, db_repo: &Repo) -> Result<()> {
+    let grid = create_grid_from_dto(repo_dto.visualizer_method).await?;
+
+    let mut working_dir = std::env::current_dir()?;
     working_dir.push(REPO_DOWNLOAD_DIR);
-    working_dir.push(repo.uuid);
-    let repo_path = working_dir.join(create_repo_dto.name);
+    working_dir.push(&db_repo.uuid);
+    let repo_path = working_dir.join(repo_dto.name);
 
-    let mut repo = git::repo::Repo::new(
+    let mut git_repo = git::repo::Repo::new(
         repo_path.clone(),
-        create_repo_dto.branch,
-        create_repo_dto.timezone,
-        create_repo_dto.username,
-        create_repo_dto.email,
+        repo_dto.branch,
+        repo_dto.timezone,
+        repo_dto.username,
+        repo_dto.email,
     );
-    repo.init().await.unwrap();
-    debug!("Repo: {repo:?}");
+    git_repo.init().await.unwrap();
+    debug!("Git repo: {git_repo:?}");
 
-    grid.populate_repo(&mut repo).await.unwrap();
-    debug!("Repo populated");
+    grid.populate_repo(&mut git_repo).await?;
+    debug!("Repo populated {}", db_repo.uuid);
 
-    compress_directory(&repo_path).await.unwrap();
-    debug!("Compress repo");
+    compress_directory(&repo_path).await?;
+    debug!("Compress repo {}", db_repo.uuid);
+
+    Ok(())
 }
