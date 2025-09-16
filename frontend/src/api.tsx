@@ -2,6 +2,7 @@ import type { Dispatch } from "react";
 
 import { type CommitCount, Font, VisualizerMethod } from "./constants.ts";
 import type { AddToast } from "./context.tsx";
+import type { CreateRepoData } from "./types.ts";
 
 const BACKEND_ENDPOINT = import.meta.env.BACKEND_ENDPOINT || "http://localhost:5173/api/";
 
@@ -34,9 +35,35 @@ function upload(file: File): ReqControl {
   return [promise, controller];
 }
 
+function createRepo(repo: CreateRepoData): ReqControl {
+  const data = {
+    ...repo,
+    visualizer_method: {
+      method: "RawPattern",
+      start_date: repo.startDate,
+      raw_pattern: repo.data,
+    },
+  };
+  return post("repo", data);
+}
+
+function getRepo(uuid: string): ReqControl {
+  return get(`repo/${uuid}`);
+}
+
+function download(uuid: string, name: string) {
+  const url = `${BACKEND_ENDPOINT}download/${uuid}/${name}.tar.zst`;
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 type ReqControl = [Promise<Response>, AbortController];
 
-function get(path: string, req: Record<string, unknown>): ReqControl {
+function get(path: string, req: Record<string, unknown> = {}): ReqControl {
   const params = new URLSearchParams();
   const controller = new AbortController();
   for (const [k, v] of Object.entries(req)) {
@@ -47,10 +74,28 @@ function get(path: string, req: Record<string, unknown>): ReqControl {
   return [fetchPromise, controller];
 }
 
-function checkStatus(res: Response) {
+function post(path: string, req: Record<string, unknown>): ReqControl {
+  const controller = new AbortController();
+  const url = BACKEND_ENDPOINT + path;
+  const fetchPromise = fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    signal: controller.signal,
+  }).then(checkStatus);
+  return [fetchPromise, controller];
+}
+
+async function checkStatus(res: Response) {
   if (!res.ok) {
-    console.error(`Response with status ${res.status} ${res.statusText}`);
-    throw Error(res.statusText);
+    const body = await res.text();
+    let message = `Response with status ${res.status} ${res.statusText}. Body: ${body}`;
+    console.error(message);
+    message = message.slice(0, 512); // keep it short
+    throw Error(message);
   }
   return res;
 }
@@ -74,4 +119,4 @@ function errHandler(addToast: AddToast, setErr: Dispatch<string> = () => {}) {
   };
 }
 
-export default { preview, upload, errHandler, checkStatus };
+export default { preview, upload, errHandler, createRepo, getRepo, download };

@@ -32,7 +32,15 @@ type CreateRepoData = {
   data: CommitCount[];
 };
 
-type UpdateCreateRepoData = (newData: Partial<CreateRepoData>) => void;
+type Repo = {
+  uuid: string;
+  name: string;
+  username: string;
+  email: string;
+  branch: string;
+  method: number;
+  status: "New" | "InProgress" | "Done" | "Error";
+};
 
 type UpdatePreviewData = (data: CommitCount[]) => void;
 type SelectPatternTabProp = { updatePreviewData: UpdatePreviewData };
@@ -50,10 +58,10 @@ export type {
   FileUploadResult,
   PreviewResult,
   CreateRepoData,
-  UpdateCreateRepoData,
   UpdatePreviewData,
   SelectPatternTabProp,
   TabComponent,
   TabId,
   TabSetting,
+  Repo,
 };
