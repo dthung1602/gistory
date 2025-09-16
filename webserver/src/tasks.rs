@@ -1,17 +1,14 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use async_compression::tokio::write::ZstdEncoder;
 use axum::body::Bytes;
 use axum::extract::multipart::Field;
-use diesel::serialize::ToSql;
-use diesel::{ExpressionMethods, OptionalExtension, QueryResult, RunQueryDsl, SqliteConnection};
+use diesel::{ExpressionMethods, RunQueryDsl};
 use gistory::git;
 use gistory::visualizer::CommitGrid;
 use log::{debug, error, info};
 use tokio::fs;
 use tokio::io::{AsyncWriteExt, BufReader};
-use tokio::sync::Mutex;
 
 use crate::constants::{REPO_DOWNLOAD_DIR, UPLOAD_DIR};
 use crate::dbconnection;
@@ -103,8 +100,6 @@ pub async fn compress_directory(path: impl AsRef<Path>) -> Result<()> {
 }
 
 pub async fn generate_repo(repo_dto: CreateRepoDto, db_repo: Repo) {
-    use std::env;
-
     use crate::schema::repo::dsl::{repo, status, uuid};
 
     info!("Start generating repo: {} {:?}", db_repo.uuid, repo_dto);

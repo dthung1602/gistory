@@ -9,6 +9,7 @@ mod tasks;
 
 use std::sync::Arc;
 
+use crate::constants::REPO_DOWNLOAD_DIR;
 use axum::{
     Extension, Router,
     routing::{get, post},
@@ -35,7 +36,7 @@ async fn main() {
         .route("/api/repo/{id}", get(handlers::get_repo))
         .route("/api/upload", post(handlers::upload_file))
         .layer(CompressionLayer::new())
-        .nest_service("/api/download", ServeDir::new("download"))
+        .nest_service("/api/download", ServeDir::new(REPO_DOWNLOAD_DIR))
         .layer(Extension(db));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
