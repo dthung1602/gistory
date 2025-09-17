@@ -51,8 +51,11 @@ function getRepo(uuid: string): ReqControl {
   return get(`repo/${uuid}`);
 }
 
-function download(uuid: string, name: string) {
-  const url = `${BACKEND_ENDPOINT}download/${uuid}/${name}.tar.zst`;
+function genDownloadUrl(uuid: string, name: string) {
+  return `${BACKEND_ENDPOINT}download/${uuid}/${name}.tar.zst`;
+}
+
+function download(url: string) {
   const link = document.createElement("a");
   link.href = url;
   link.target = "_blank";
@@ -119,4 +122,4 @@ function errHandler(addToast: AddToast, setErr: Dispatch<string> = () => {}) {
   };
 }
 
-export default { preview, upload, errHandler, createRepo, getRepo, download };
+export default { preview, upload, errHandler, createRepo, getRepo, genDownloadUrl, download };

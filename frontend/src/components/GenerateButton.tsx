@@ -1,13 +1,15 @@
-import { useContext, useState } from "react";
+import { useContext, useRef, useState } from "react";
 
 import api from "../api.tsx";
 import GenerateIcon from "../asset/auto-generate-svgrepo-com.svg?react";
+import DownloadIcon from "../asset/download-svgrepo-com.svg?react";
 import { FormContext, ToastContext } from "../context.tsx";
 import type { CreateRepoData, Repo } from "../types.ts";
 
 function GenerateButton() {
   const { addToast } = useContext(ToastContext);
   const { inputErrors, name, username, branch, email, startDate, timezone, data } = useContext(FormContext);
+  const [downloadLink, setDownloadLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -67,7 +69,9 @@ function GenerateButton() {
             type: "success",
             content: "Start downloading...",
           });
-          api.download(repo.uuid, repo.name);
+          const link = api.genDownloadUrl(repo.uuid, repo.name);
+          api.download(link);
+          setDownloadLink(link);
         }
       })
       .catch(api.errHandler(addToast, setError))
@@ -76,7 +80,7 @@ function GenerateButton() {
       });
   };
 
-  let buttonClass = "btn";
+  let buttonClass = "btn btn-lg";
   if (disabled) {
     buttonClass += " btn-disabled";
   }
@@ -90,9 +94,19 @@ function GenerateButton() {
     <div className="flex flex-col justify-center mt-8">
       <button onClick={handleClick} className={buttonClass}>
         {loading ? <span className="loading loading-spinner loading-sm" /> : <GenerateIcon className="w-6 h-6" />}
-        Generate Repo
+        Generate repo
       </button>
       <span className="text-error my-4">{error}</span>
+      {downloadLink && [
+        <button
+          className={`btn btn-lg btn-dash btn-primary py-12 text-lg ${loading ? "btn-disabled" : ""}`}
+          onClick={() => api.download(downloadLink)}
+        >
+          <DownloadIcon className="w-8 h-8 primary-sgv" />
+          <p>Download repo</p>
+        </button>,
+        <p className="text-success text-center mt-8">The downloaded repo is empty, with only the .git directory</p>,
+      ]}
     </div>
   );
 }

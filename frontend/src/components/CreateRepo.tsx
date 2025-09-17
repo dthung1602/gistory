@@ -1,4 +1,5 @@
 import { FormContextProvider } from "../context.tsx";
+import CommitCodeGuide from "./CommitCodeGuide.tsx";
 import GenerateButton from "./GenerateButton.tsx";
 import RepoDetail from "./RepoDetail.tsx";
 import SelectPattern from "./SelectPattern.tsx";
@@ -11,6 +12,7 @@ function CreateRepo() {
           <SelectPattern />
           <RepoDetail />
           <GenerateButton />
+          <CommitCodeGuide />
         </div>
       </div>
     </FormContextProvider>

@@ -91,3 +91,15 @@
     --5-y-position: 85%;
   }
 }
+
+.btn:hover .primary-sgv path {
+  stroke: var(--color-primary-content);
+}
+
+.btn-disabled .primary-sgv path {
+  stroke: var(--btn-fg);
+}
+
+a:hover .ferris {
+  visibility: visible;
+}
