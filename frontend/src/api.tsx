@@ -4,7 +4,7 @@ import { type CommitCount, Font, VisualizerMethod } from "./constants.ts";
 import type { AddToast } from "./context.tsx";
 import type { CreateRepoData } from "./types.ts";
 
-const BACKEND_ENDPOINT = import.meta.env.BACKEND_ENDPOINT || "http://localhost:5173/api/";
+const BACKEND_ENDPOINT = import.meta.env.VITE_BACKEND_ENDPOINT || "/api/";
 
 type PreviewReq = {
   method: VisualizerMethod;

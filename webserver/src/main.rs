@@ -10,13 +10,16 @@ mod tasks;
 use std::sync::Arc;
 
 use crate::constants::REPO_DOWNLOAD_DIR;
+use axum::http::Method;
 use axum::{
     Extension, Router,
     routing::{get, post},
 };
+use core::time::Duration;
 use dotenvy::dotenv;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
+use tower_http::cors::{Any, CorsLayer, MaxAge};
 use tower_http::services::{ServeDir, ServeFile};
 
 #[tokio::main]
@@ -24,6 +27,11 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
     let db = Arc::new(Mutex::new(dbconnection::establish_connection()));
+
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(Any)
+        .max_age(MaxAge::exact(Duration::from_secs(3600 * 24)));
 
     let app = Router::new()
         .route_service(
@@ -36,6 +44,7 @@ async fn main() {
         .route("/api/repo/{id}", get(handlers::get_repo))
         .route("/api/upload", post(handlers::upload_file))
         .layer(CompressionLayer::new())
+        .layer(cors)
         .nest_service("/api/download", ServeDir::new(REPO_DOWNLOAD_DIR))
         .layer(Extension(db));
 
