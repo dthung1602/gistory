@@ -1,0 +1,22 @@
+# Rust build artifacts
+target
+**/target
+
+# Node / frontend artifacts
+node_modules
+frontend/node_modules
+dist
+build
+
+# VCS / local files
+.git
+.gitignore
+*.log
+
+# Docker/CI files themselves
+Dockerfile
+cloudbuild.yaml
+
+# IDE
+.idea
+.vscode
