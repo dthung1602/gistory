@@ -63,6 +63,8 @@ function GenerateButton() {
             type: "error",
             content: "Error creating repo. Try again later.",
           });
+          setError("Error creating repo. Try again later.");
+          setDownloadLink("");
         } else {
           addToast({
             key: Math.random(),
@@ -72,6 +74,7 @@ function GenerateButton() {
           const link = api.genDownloadUrl(repo.uuid, repo.name);
           api.download(link);
           setDownloadLink(link);
+          setError("");
         }
       })
       .catch(api.errHandler(addToast, setError))

@@ -12,11 +12,12 @@ use std::sync::Arc;
 use crate::constants::REPO_DOWNLOAD_DIR;
 use axum::http::Method;
 use axum::{
-    Extension, Router,
-    routing::{get, post},
+    routing::{get, post}, Extension,
+    Router,
 };
 use core::time::Duration;
 use dotenvy::dotenv;
+use http::header::{ACCEPT, CONTENT_TYPE};
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer, MaxAge};
@@ -31,6 +32,7 @@ async fn main() {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(Any)
+        .allow_headers([ACCEPT, CONTENT_TYPE])
         .max_age(MaxAge::exact(Duration::from_secs(3600 * 24)));
 
     let app = Router::new()
