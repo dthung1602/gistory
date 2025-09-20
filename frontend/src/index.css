@@ -100,6 +100,6 @@
   stroke: var(--btn-fg);
 }
 
-a:hover .ferris {
+a:hover .visible-on-a-hover {
   visibility: visible;
 }

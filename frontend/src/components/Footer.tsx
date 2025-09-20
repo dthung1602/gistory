@@ -23,9 +23,14 @@ function Footer() {
         <h6 className="footer-title text-info">Built with</h6>
         <a className="link link-hover" href="https://github.com/tokio-rs/axum">
           Axum
-          <a href="https://www.behance.net/gallery/42774743/Rustacean#">
-            <img src={ferris} alt="ferris" className="h-6 inline invisible ml-2 ferris" />
-          </a>
+          <span
+            onClick={event => {
+              window.open("https://github.com/tokio-rs/axum", "_blank");
+              event.preventDefault();
+            }}
+          >
+            <img src={ferris} alt="ferris" className="h-6 inline invisible ml-2 visible-on-a-hover" />
+          </span>
         </a>
         <a className="link link-hover" href="https://react.dev/">
           React
