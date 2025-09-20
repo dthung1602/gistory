@@ -1,5 +1,3 @@
-import * as React from "react";
-
 import type { OnInputChange } from "../types.ts";
 
 type InputFileProp = {

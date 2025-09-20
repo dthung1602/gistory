@@ -1,7 +1,11 @@
-import { useContext, useRef, useState } from "react";
+import { useContext, useState } from "react";
 
 import api from "../api.tsx";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
 import GenerateIcon from "../asset/auto-generate-svgrepo-com.svg?react";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
 import DownloadIcon from "../asset/download-svgrepo-com.svg?react";
 import { FormContext, ToastContext } from "../context.tsx";
 import type { CreateRepoData, Repo } from "../types.ts";
