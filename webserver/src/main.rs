@@ -16,8 +16,10 @@ use axum::{
     Router,
 };
 use core::time::Duration;
+use std::env;
 use dotenvy::dotenv;
 use http::header::{ACCEPT, CONTENT_TYPE};
+use log::info;
 use tokio::sync::Mutex;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer, MaxAge};
@@ -28,6 +30,8 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
     let db = Arc::new(Mutex::new(dbconnection::establish_connection()));
+
+    let port = env::var("PORT").unwrap_or("3000".to_string());
 
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
@@ -50,6 +54,7 @@ async fn main() {
         .nest_service("/api/download", ServeDir::new(REPO_DOWNLOAD_DIR))
         .layer(Extension(db));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
+    info!("Start listening on port {port}");
     axum::serve(listener, app).await.unwrap();
 }
