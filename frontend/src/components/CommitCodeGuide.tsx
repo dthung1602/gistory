@@ -42,8 +42,8 @@ function CommitCodeGuide() {
       </ul>
       <div className="text-xl font-bold px-1 pt-8 pb-4">How this works?</div>
       <p className="px-2 pb-4">
-        Github update your commit graph retroactively using the timestamp of the commit itself, not when github receives
-        the repo/commit
+        Github updates your commit graph retroactively using the timestamp of the commit itself, not when the commit
+        pushed to Github
       </p>
       <p className="px-2 pb-4">Gistory creates a bunch of empty commits to simulate the commit history of the repo</p>
     </>

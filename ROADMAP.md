@@ -28,8 +28,16 @@
 - [x] Select tech stack
 - [x] Bootstrap
 - [x] Design (use magicpatterns.com?)
-- [ ] Implementation
-    - [ ] Landing page
-    - [ ] Draw pattern
-    - [ ] Upload pattern file
-    - [ ] Call API / poll result / Download
+- [x] Implementation
+    - [x] Landing page
+    - [x] Draw pattern
+    - [x] Upload pattern file
+    - [x] Call API / poll result / Download
+
+## Misc
+- [x] CI/CD
+  - [x] Publish FE to GitHub Pages
+  - [x] Publish BE to Dockerhub
+  - [ ] Run BE to Cloud Run
+  - [ ] Write doc for the project
+- [ ] Readme
