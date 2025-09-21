@@ -1,12 +1,14 @@
 [package]
 name = "gistory"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "Create custom commit patterns to display on your GitHub profile"
 homepage = "https://dthung1602.github.io/gistory/"
 repository = "https://github.com/dthung1602/gistory"
 readme = "README.md"
+keywords = ["git", "github", "commit-graph", "git-history"]
+categories = ["command-line-interface"]
 
 [dependencies]
 atoi = "2.0.0"
