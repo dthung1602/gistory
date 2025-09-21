@@ -125,7 +125,7 @@ export DATABASE_URL='./database.db' # or save it to .env file
 diesel migration run
 # run webserver
 cargo build
-cargo run # webserver will be running on http://localhost:3000
+cargo run --bin webserver # webserver will be running on http://localhost:3000
 ```
 
 ### Frontend

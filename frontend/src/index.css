@@ -103,3 +103,7 @@
 a:hover .visible-on-a-hover {
   visibility: visible;
 }
+
+code {
+  @apply border-neutral-content border py-1 px-2 rounded-sm mx-1
+}

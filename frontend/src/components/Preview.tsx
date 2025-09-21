@@ -111,6 +111,7 @@ function Preview({ startDate, data, setDataAtIndex, loading = false }: Prop) {
         Preview
         {loading ? <span className="loading loading-dots loading-sm" /> : null}
       </h2>
+      <span className="italic w-full">Click the squares to manually adjust</span>
       <div className="pb-4 pl-8 mb-2 form-container overflow-x-scroll">
         <div className="grid grid-rows-8 grid-flow-col gap-1.5 justify-start" aria-label="commit-graph">
           <div key="First" />
@@ -155,6 +156,8 @@ function Preview({ startDate, data, setDataAtIndex, loading = false }: Prop) {
         <a
           className="hover:underline"
           href="https://docs.github.com/articles/why-are-my-contributions-not-showing-up-on-my-profile"
+          target="_blank"
+          rel="noreferrer"
         >
           How GitHub calculate contribution?
         </a>

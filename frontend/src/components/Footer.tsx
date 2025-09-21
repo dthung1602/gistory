@@ -12,6 +12,9 @@ function Footer() {
         <a className="link link-hover" href="https://github.com/dthung1602/gistory">
           GitHub
         </a>
+        <a className="link link-hover" href="https://crates.io/crates/gistory">
+          Crate
+        </a>
         <a className="link link-hover" href="https://github.com/dthung1602/gistory/issues">
           Report issue
         </a>
@@ -25,7 +28,7 @@ function Footer() {
           Axum
           <span
             onClick={event => {
-              window.open("https://github.com/tokio-rs/axum", "_blank");
+              window.open("https://www.behance.net/gallery/42774743/Rustacean#", "_blank");
               event.preventDefault();
             }}
           >
