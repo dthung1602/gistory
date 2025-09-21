@@ -26,7 +26,7 @@ function GenerateButton() {
     const emptyField = data.length == 0 || textFields.includes("") || textFields.includes(null);
 
     if (emptyField) {
-      addToast({ type: "success", content: "Please fill in all fields" });
+      addToast({ type: "warning", content: "Please fill in all fields" });
       return;
     }
 
