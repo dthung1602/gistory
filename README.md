@@ -4,6 +4,9 @@ A tool to create custom commit patterns to display on your GitHub profile
 
 It includes a CLI, a Rust library, a REST API and a webpage
 
+>> [Try out on browser](https://dthung1602.github.io/gistory/) <<
+>> [Rust Crate](https://crates.io/crates/gistory) <<
+
 ## How it works
 
 - Github updates your commit graph retroactively using the timestamp of the commit itself, not when the commit
